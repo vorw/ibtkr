@@ -336,6 +336,13 @@ export default function InnovationApp() {
     finally { mutationLock.current = false; setBusy(false); }
   }
   function moveMission(direction: number) { setMissionIndex((current) => (current + direction + challenges.length) % challenges.length); }
+  function moveMissionByArrow(side: 'right' | 'left') {
+    const mobileLayout = window.matchMedia('(max-width: 760px)').matches;
+    const direction = side === 'right'
+      ? (mobileLayout ? -1 : 1)
+      : (mobileLayout ? 1 : -1);
+    moveMission(direction);
+  }
   function moveSpotlight(event: PointerEvent<HTMLElement>) {
     if (event.pointerType === 'touch' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const rectangle = event.currentTarget.getBoundingClientRect();
@@ -375,14 +382,13 @@ export default function InnovationApp() {
               <div className="mission-topline"><span><span className="label-square" /> مساحة صغيرة لفكرة كبيرة</span><span className="mission-reward" dir="ltr">+20 XP</span></div>
               <div className="mission-copy" key={mission.id} aria-live="polite" aria-atomic="true"><span className="mission-type">{mission.type} <i /> {mission.category}</span><h1>{headline ? <><span>{headline[1]}</span><span>{headline[2]}</span></> : mission.title}</h1><p>{mission.description}</p></div>
               <div className="mission-controls"><Button className="launch-button" onClick={() => start(mission)}>ابدأ بفكرة <ArrowUpLeft size={21} /></Button><button className="brief-button" onClick={() => openChallenge(mission)}>تفاصيل المهمة <ArrowLeft size={18} /></button></div>
-              <div className="mission-footer"><span>على راحتك. بلا مؤقّت، وبلا فكرة مثالية.</span><div className="mission-pager"><button aria-label="المهمة السابقة" onClick={() => moveMission(-1)}><ChevronRight size={19} /></button><span dir="ltr"><b>{mission.number}</b><i> / 03</i></span><button aria-label="المهمة التالية" onClick={() => moveMission(1)}><ChevronLeft size={19} /></button></div></div>
+              <div className="mission-footer"><span>على راحتك. بلا مؤقّت، وبلا فكرة مثالية.</span><div className="mission-pager"><button aria-label="تنقّل بالمهمات إلى اليمين" onClick={() => moveMissionByArrow('right')}><ChevronRight size={19} /></button><span dir="ltr"><b>{mission.number}</b><i> / 03</i></span><button aria-label="تنقّل بالمهمات إلى اليسار" onClick={() => moveMissionByArrow('left')}><ChevronLeft size={19} /></button></div></div>
             </article>
             <aside className="command-stack">
               <section className="mission-selector"><div className="panel-top"><h2>أي سؤال يلفتك؟</h2><span dir="ltr">01—03</span></div><div className="mission-options">{challenges.map((challenge, index) => { const Icon = icons[challenge.icon]; return <button key={challenge.id} className={`mission-option tone-${palette[index]}`} aria-pressed={missionIndex === index} onClick={() => setMissionIndex(index)}><span className="option-number">{challenge.number}</span><span className="option-copy"><strong>{challenge.type}</strong><small>{challenge.category}</small></span><Icon size={20} strokeWidth={1.5} /></button>; })}</div><p>ثلاث طرق للتفكير. اختر أي بداية.</p></section>
               {loading ? <Skeleton className="panel-skeleton" /> : data.signedIn ? <PlayerPanel compact progress={data.progress} onProfile={() => changeTab('profile')} /> : !error && <SignInNotice compact href={signInHref({ view: 'profile' })} />}
             </aside>
           </section>
-          <a className="scroll-cue" href="#community-preview"><span>أفكار تستحق الاستكشاف</span><span className="scroll-cue-line" aria-hidden="true" /></a>
           <Reveal className="community-preview section-block"><div id="community-preview" className="section-heading"><div><span className="eyebrow">من المجتمع</span><h2>فكرة منك.<br /><span>وزاوية من غيرك.</span></h2></div><div className="section-aside"><p>شارك ما تفكّر فيه، وساعد فكرة أخرى تكبر.</p><button className="text-link" onClick={() => changeTab('ideas')}>كل الأفكار <ArrowLeft size={18} /></button></div></div>{loading ? <Skeleton className="feed-skeleton" /> : !data.signedIn ? !error && <SignInNotice href={signInHref({ view: 'ideas' })} /> : data.ideas.length ? <div className="idea-grid">{ideaCards(data.ideas.slice(0, 3))}</div> : <EmptyState onStart={() => changeTab('challenges')} />}</Reveal>
         </TabsContent>
 
