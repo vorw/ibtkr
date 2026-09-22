@@ -1,7 +1,7 @@
 import { getParticipant } from '@/lib/auth-server';
 import { database } from '@/lib/database';
 import { challenges, type AppData, type Comment, type Idea } from '@/lib/challenges';
-import { validateDisplayName } from '@/lib/profile';
+import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -112,6 +112,16 @@ export async function POST(request: Request) {
         .bind(normalized.nameKey, user.userId)
         .first<{ user_id: string }>();
       if (occupied) return reply({ error: 'الاسم مستخدم بالفعل. جرّب اسمًا ثانيًا.' }, 409);
+
+      // Legacy profiles were backfilled in SQL before JavaScript normalization existed.
+      // Re-check their visible names with the current normalizer so variants such as
+      // "أحمد" and "احمد" cannot become two separate community identities.
+      const otherProfiles = await db.prepare('SELECT user_id,display_name FROM profiles WHERE user_id<>?')
+        .bind(user.userId)
+        .all<{ user_id: string; display_name: string }>();
+      if (otherProfiles.results.some(row => displayNameKey(row.display_name) === normalized.nameKey)) {
+        return reply({ error: 'الاسم مستخدم بالفعل. جرّب اسمًا ثانيًا.' }, 409);
+      }
 
       try {
         await db.prepare(`INSERT INTO profiles (user_id,display_name,name_key,created_at,updated_at)
