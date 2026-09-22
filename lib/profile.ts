@@ -9,6 +9,7 @@ export function cleanDisplayName(value: string): string {
 export function displayNameKey(value: string): string {
   return cleanDisplayName(value)
     .replace(arabicMarks, '')
+    .replace(/[أإآٱ]/g, 'ا')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
