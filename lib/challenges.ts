@@ -6,4 +6,4 @@ export const challenges = [
 export type Challenge=typeof challenges[number];
 export type Comment={id:string;name:string;body:string;created_at:string;isOwn:boolean};
 export type Idea={id:string;challenge_id:string;name:string;title:string;body:string;created_at:string;isOwn:boolean;likes:number;liked:boolean;comments:Comment[]};
-export type AppData={signedIn:boolean;ideas:Idea[];progress:{xp:number;ideas:number;reviews:number}};
+export type AppData={signedIn:boolean;ideas:Idea[];progress:{xp:number;ideas:number;reviews:number};profile:{displayName:string}|null};
