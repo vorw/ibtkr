@@ -1,4 +1,5 @@
 name: Verify
+# Verifies profile identity changes before merge.
 
 on:
   pull_request:
