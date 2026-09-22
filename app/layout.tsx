@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   title: "ابتكر | لجنة الابتكار — FTC",
   description: "مساحة لجنة الابتكار في نادي تقنية المستقبل. تحديات، أفكار، وبدايات جديدة.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/favicon.svg?v=bulb1",
+    shortcut: "/favicon.svg?v=bulb1",
   },
 };
 
