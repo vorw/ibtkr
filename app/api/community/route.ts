@@ -1,40 +1,106 @@
 import { getParticipant } from '@/lib/auth-server';
 import { database } from '@/lib/database';
 import { challenges, type AppData, type Comment, type Idea } from '@/lib/challenges';
+import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown, status = 200) => Response.json(data, {
   status, headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' },
 });
+
 type IdeaRow = Omit<Idea, 'isOwn' | 'liked' | 'comments'> & { user_id: string; liked: number };
 type CommentRow = Omit<Comment, 'isOwn'> & { user_id: string; idea_id: string };
+type ProfileRow = { display_name: string; name_key: string };
+
+let profilesSchemaReady: Promise<void> | null = null;
+async function ensureProfilesSchema(db: D1Database): Promise<void> {
+  if (!profilesSchemaReady) {
+    profilesSchemaReady = (async () => {
+      await db.prepare(`CREATE TABLE IF NOT EXISTS profiles (
+        user_id text PRIMARY KEY NOT NULL,
+        display_name text NOT NULL,
+        name_key text NOT NULL,
+        created_at text NOT NULL,
+        updated_at text NOT NULL
+      )`).run();
+      await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_name_key ON profiles (name_key)').run();
+      await db.prepare(`WITH legacy_names AS (
+        SELECT user_id, name, created_at FROM ideas
+        UNION ALL
+        SELECT user_id, name, created_at FROM comments
+      ),
+      ranked_names AS (
+        SELECT user_id, name, created_at,
+          ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, name DESC) AS position
+        FROM legacy_names
+      )
+      INSERT OR IGNORE INTO profiles (user_id,display_name,name_key,created_at,updated_at)
+      SELECT user_id,trim(name),lower(trim(replace(name,'ـ',''))),created_at,created_at
+      FROM ranked_names
+      WHERE position=1 AND length(trim(name))>=2`).run();
+    })();
+  }
+  try {
+    await profilesSchemaReady;
+  } catch (error) {
+    profilesSchemaReady = null;
+    throw error;
+  }
+}
+
+async function getProfile(db: D1Database, userId: string): Promise<ProfileRow | null> {
+  return db.prepare('SELECT display_name,name_key FROM profiles WHERE user_id=?').bind(userId).first<ProfileRow>();
+}
 
 async function readCommunity(userId: string): Promise<AppData> {
   const db = database();
-  const [ideas, comments, own, reviews] = await Promise.all([
-    db.prepare('SELECT i.*, (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.liked=1) likes, (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.user_id=? AND r.liked=1) liked FROM ideas i WHERE i.id IN (SELECT id FROM ideas ORDER BY created_at DESC, id DESC LIMIT 100) OR i.user_id=? ORDER BY i.created_at DESC, i.id DESC').bind(userId, userId).all<IdeaRow>(),
-    db.prepare('SELECT * FROM comments WHERE idea_id IN (SELECT id FROM ideas ORDER BY created_at DESC, id DESC LIMIT 100) OR idea_id IN (SELECT id FROM ideas WHERE user_id=?) ORDER BY created_at ASC, id ASC').bind(userId).all<CommentRow>(),
+  const [ideas, comments, own, reviews, profile] = await Promise.all([
+    db.prepare(`SELECT i.id,i.user_id,i.challenge_id,COALESCE(p.display_name,i.name) name,i.title,i.body,i.created_at,
+      (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.liked=1) likes,
+      (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.user_id=? AND r.liked=1) liked
+      FROM ideas i LEFT JOIN profiles p ON p.user_id=i.user_id
+      WHERE i.id IN (SELECT id FROM ideas ORDER BY created_at DESC, id DESC LIMIT 100) OR i.user_id=?
+      ORDER BY i.created_at DESC, i.id DESC`).bind(userId, userId).all<IdeaRow>(),
+    db.prepare(`SELECT c.id,c.idea_id,c.user_id,COALESCE(p.display_name,c.name) name,c.body,c.created_at
+      FROM comments c LEFT JOIN profiles p ON p.user_id=c.user_id
+      WHERE c.idea_id IN (SELECT id FROM ideas ORDER BY created_at DESC, id DESC LIMIT 100)
+        OR c.idea_id IN (SELECT id FROM ideas WHERE user_id=?)
+      ORDER BY c.created_at ASC, c.id ASC`).bind(userId).all<CommentRow>(),
     db.prepare('SELECT COUNT(*) total, COUNT(DISTINCT challenge_id) rewarded FROM ideas WHERE user_id=?').bind(userId).first<{ total: number; rewarded: number }>(),
     db.prepare('SELECT COUNT(DISTINCT c.idea_id) total FROM comments c JOIN ideas i ON c.idea_id=i.id WHERE c.user_id=? AND i.user_id<>?').bind(userId, userId).first<{ total: number }>(),
+    getProfile(db, userId),
   ]);
+
   const discussions = new Map<string, Comment[]>();
   for (const { user_id, idea_id, ...comment } of comments.results) {
     const entries = discussions.get(idea_id) ?? [];
     entries.push({ ...comment, isOwn: user_id === userId });
     discussions.set(idea_id, entries);
   }
+
   return {
     signedIn: true,
-    ideas: ideas.results.map(({ user_id, liked, ...idea }) => ({ ...idea, isOwn: user_id === userId, liked: Boolean(liked), comments: discussions.get(idea.id) ?? [] })),
-    progress: { ideas: own?.total ?? 0, reviews: reviews?.total ?? 0, xp: (own?.rewarded ?? 0) * 20 + (reviews?.total ?? 0) * 5 },
+    ideas: ideas.results.map(({ user_id, liked, ...idea }) => ({
+      ...idea,
+      isOwn: user_id === userId,
+      liked: Boolean(liked),
+      comments: discussions.get(idea.id) ?? [],
+    })),
+    progress: {
+      ideas: own?.total ?? 0,
+      reviews: reviews?.total ?? 0,
+      xp: (own?.rewarded ?? 0) * 20 + (reviews?.total ?? 0) * 5,
+    },
+    profile: profile ? { displayName: profile.display_name } : null,
   };
 }
 
 export async function GET(request: Request) {
   try {
     const user = await getParticipant(request);
-    if (!user) return reply({ signedIn: false, ideas: [], progress: { xp: 0, ideas: 0, reviews: 0 } });
+    if (!user) return reply({ signedIn: false, ideas: [], progress: { xp: 0, ideas: 0, reviews: 0 }, profile: null });
+    await ensureProfilesSchema(database());
     return reply(await readCommunity(user.userId));
   } catch (error) {
     console.error('Community load', error);
@@ -42,8 +108,9 @@ export async function GET(request: Request) {
   }
 }
 
-const common = { id: z.string().uuid(), name: z.string().trim().min(1).max(40) };
+const common = { id: z.string().uuid() };
 const schema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('profile'), displayName: z.string().max(80) }),
   z.object({ action: z.literal('idea'), ...common, challengeId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
   z.object({ action: z.literal('edit'), ...common, title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
   z.object({ action: z.literal('comment'), ...common, ideaId: z.string().uuid(), body: z.string().trim().min(5).max(1000) }),
@@ -55,27 +122,78 @@ export async function POST(request: Request) {
     if (request.headers.get('sec-fetch-site') === 'cross-site') return reply({ error: 'طلب غير مسموح.' }, 403);
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(request.url).origin) return reply({ error: 'طلب غير مسموح.' }, 403);
+
     const user = await getParticipant(request);
     if (!user) return reply({ error: 'سجّل دخولك عشان تحفظ مشاركتك. مسودتك باقية.' }, 401);
+
     const raw = await request.text();
     if (raw.length > 12000) return reply({ error: 'المشاركة طويلة جدًا.' }, 413);
+
     let json: unknown;
     try { json = JSON.parse(raw); } catch { return reply({ error: 'صيغة المشاركة غير صالحة.' }, 400); }
+
     const parsed = schema.safeParse(json);
-    if (!parsed.success) return reply({ error: 'تأكد من الاسم والعنوان والمشاركة، ثم جرّب ثانية.' }, 400);
+    if (!parsed.success) return reply({ error: 'تأكد من البيانات ثم جرّب ثانية.' }, 400);
+
     const value = parsed.data;
     const db = database();
+    await ensureProfilesSchema(db);
     const now = new Date().toISOString();
+
+    if (value.action === 'profile') {
+      const normalized = validateDisplayName(value.displayName);
+      if (!normalized) {
+        return reply({ error: 'اختر اسمًا من حرفين إلى 30 حرفًا، بدون رموز غريبة.' }, 400);
+      }
+
+      const occupied = await db.prepare('SELECT user_id FROM profiles WHERE name_key=? AND user_id<>?')
+        .bind(normalized.nameKey, user.userId)
+        .first<{ user_id: string }>();
+      if (occupied) return reply({ error: 'الاسم مستخدم بالفعل. جرّب اسمًا ثانيًا.' }, 409);
+
+      // Legacy profiles were backfilled in SQL before JavaScript normalization existed.
+      // Re-check their visible names with the current normalizer so variants such as
+      // "أحمد" and "احمد" cannot become two separate community identities.
+      const otherProfiles = await db.prepare('SELECT user_id,display_name FROM profiles WHERE user_id<>?')
+        .bind(user.userId)
+        .all<{ user_id: string; display_name: string }>();
+      if (otherProfiles.results.some(row => displayNameKey(row.display_name) === normalized.nameKey)) {
+        return reply({ error: 'الاسم مستخدم بالفعل. جرّب اسمًا ثانيًا.' }, 409);
+      }
+
+      try {
+        await db.prepare(`INSERT INTO profiles (user_id,display_name,name_key,created_at,updated_at)
+          VALUES (?,?,?,?,?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            display_name=excluded.display_name,
+            name_key=excluded.name_key,
+            updated_at=excluded.updated_at`)
+          .bind(user.userId, normalized.displayName, normalized.nameKey, now, now)
+          .run();
+      } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : '';
+        if (message.includes('unique') || message.includes('constraint')) {
+          return reply({ error: 'الاسم مستخدم بالفعل. جرّب اسمًا ثانيًا.' }, 409);
+        }
+        throw error;
+      }
+
+      return reply({ ok: true, community: await readCommunity(user.userId) });
+    }
+
+    const profile = await getProfile(db, user.userId);
+    if (!profile) return reply({ error: 'اختر اسمك الظاهر أول عشان تكمل.' }, 428);
+    const participantName = profile.display_name;
     let ideaId: string;
 
     if (value.action === 'idea') {
       ideaId = value.id;
       if (!challenges.some(challenge => challenge.id === value.challengeId)) return reply({ error: 'المهمة غير موجودة.' }, 404);
       await db.prepare('INSERT INTO ideas (id,user_id,challenge_id,name,title,body,created_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING')
-        .bind(value.id, user.userId, value.challengeId, value.name, value.title, value.body, now).run();
-      // Retrying an ID is safe only when it refers to the exact same participation.
-      const saved = await db.prepare('SELECT user_id,challenge_id,name,title,body FROM ideas WHERE id=?').bind(value.id).first<IdeaRow>();
-      if (!saved || saved.user_id !== user.userId || saved.challenge_id !== value.challengeId || saved.name !== value.name || saved.title !== value.title || saved.body !== value.body) {
+        .bind(value.id, user.userId, value.challengeId, participantName, value.title, value.body, now).run();
+
+      const saved = await db.prepare('SELECT user_id,challenge_id,title,body FROM ideas WHERE id=?').bind(value.id).first<Pick<IdeaRow, 'user_id' | 'challenge_id' | 'title' | 'body'>>();
+      if (!saved || saved.user_id !== user.userId || saved.challenge_id !== value.challengeId || saved.title !== value.title || saved.body !== value.body) {
         return reply({ error: 'سبق حفظ نسخة مختلفة من هذه المسودة. افتحها من أفكارك لتطويرها.' }, 409);
       }
     } else if (value.action === 'edit') {
@@ -83,16 +201,19 @@ export async function POST(request: Request) {
       const row = await db.prepare('SELECT user_id FROM ideas WHERE id=?').bind(value.id).first<{ user_id: string }>();
       if (!row) return reply({ error: 'الفكرة غير موجودة.' }, 404);
       if (row.user_id !== user.userId) return reply({ error: 'تقدر تعدّل فكرتك أنت فقط.' }, 403);
-      await db.prepare('UPDATE ideas SET name=?,title=?,body=? WHERE id=? AND user_id=?').bind(value.name, value.title, value.body, value.id, user.userId).run();
+      await db.prepare('UPDATE ideas SET name=?,title=?,body=? WHERE id=? AND user_id=?')
+        .bind(participantName, value.title, value.body, value.id, user.userId).run();
     } else {
       ideaId = value.ideaId;
       const row = await db.prepare('SELECT user_id FROM ideas WHERE id=?').bind(value.ideaId).first<{ user_id: string }>();
       if (!row) return reply({ error: 'الفكرة غير موجودة.' }, 404);
+
       if (value.action === 'comment') {
         await db.prepare('INSERT INTO comments (id,idea_id,user_id,name,body,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING')
-          .bind(value.id, value.ideaId, user.userId, value.name, value.body, now).run();
-        const saved = await db.prepare('SELECT user_id,idea_id,name,body FROM comments WHERE id=?').bind(value.id).first<CommentRow>();
-        if (!saved || saved.user_id !== user.userId || saved.idea_id !== value.ideaId || saved.name !== value.name || saved.body !== value.body) {
+          .bind(value.id, value.ideaId, user.userId, participantName, value.body, now).run();
+
+        const saved = await db.prepare('SELECT user_id,idea_id,body FROM comments WHERE id=?').bind(value.id).first<Pick<CommentRow, 'user_id' | 'idea_id' | 'body'>>();
+        if (!saved || saved.user_id !== user.userId || saved.idea_id !== value.ideaId || saved.body !== value.body) {
           return reply({ error: 'سبق حفظ تعليق مختلف من هذه المسودة. راجع النقاش قبل الإرسال مجددًا.' }, 409);
         }
       } else {
@@ -101,7 +222,7 @@ export async function POST(request: Request) {
           .bind(value.ideaId, user.userId, value.liked ? 1 : 0).run();
       }
     }
-    // Show the confirmed save without relying on a second client fetch succeeding.
+
     return reply({ ok: true, ideaId, community: await readCommunity(user.userId) });
   } catch (error) {
     console.error('Community save', error);

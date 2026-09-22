@@ -1,4 +1,39 @@
-import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core';
-export const ideas = sqliteTable('ideas', {id:text('id').primaryKey(),userId:text('user_id').notNull(),challengeId:text('challenge_id').notNull(),name:text('name').notNull(),title:text('title').notNull(),body:text('body').notNull(),createdAt:text('created_at').notNull()},t=>[index('idx_ideas_user').on(t.userId)]);
-export const comments = sqliteTable('comments', {id:text('id').primaryKey(),ideaId:text('idea_id').notNull().references(()=>ideas.id),userId:text('user_id').notNull(),name:text('name').notNull(),body:text('body').notNull(),createdAt:text('created_at').notNull()},t=>[index('idx_comments_idea').on(t.ideaId),index('idx_comments_user').on(t.userId)]);
-export const reactions = sqliteTable('reactions', {ideaId:text('idea_id').notNull().references(()=>ideas.id),userId:text('user_id').notNull(),liked:integer('liked').notNull().default(1)},t=>[primaryKey({columns:[t.ideaId,t.userId]})]);
+import { sqliteTable, text, integer, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core';
+
+export const profiles = sqliteTable('profiles', {
+  userId: text('user_id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  nameKey: text('name_key').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, t => [
+  uniqueIndex('idx_profiles_name_key').on(t.nameKey),
+]);
+
+export const ideas = sqliteTable('ideas', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  challengeId: text('challenge_id').notNull(),
+  name: text('name').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  createdAt: text('created_at').notNull(),
+}, t => [index('idx_ideas_user').on(t.userId)]);
+
+export const comments = sqliteTable('comments', {
+  id: text('id').primaryKey(),
+  ideaId: text('idea_id').notNull().references(() => ideas.id),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  body: text('body').notNull(),
+  createdAt: text('created_at').notNull(),
+}, t => [
+  index('idx_comments_idea').on(t.ideaId),
+  index('idx_comments_user').on(t.userId),
+]);
+
+export const reactions = sqliteTable('reactions', {
+  ideaId: text('idea_id').notNull().references(() => ideas.id),
+  userId: text('user_id').notNull(),
+  liked: integer('liked').notNull().default(1),
+}, t => [primaryKey({ columns: [t.ideaId, t.userId] })]);

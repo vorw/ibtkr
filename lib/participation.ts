@@ -25,11 +25,11 @@ export function signInHref(resume: Resume): string {
   return `/login?return_to=${encodeURIComponent(`/?${params}`)}`;
 }
 
-export type IdeaDraft = { id: string; name: string; title: string; body: string };
+export type IdeaDraft = { id: string; title: string; body: string };
 export function readIdeaDraft(value: string | null): IdeaDraft | null {
   try {
     const draft = JSON.parse(value ?? 'null');
-    if (draft && uuid.test(draft.id) && ['name', 'title', 'body'].every(key => typeof draft[key] === 'string') && draft.name.length <= 40 && draft.title.length <= 100 && draft.body.length <= 2000) return draft;
+    if (draft && uuid.test(draft.id) && ['title', 'body'].every(key => typeof draft[key] === 'string') && draft.title.length <= 100 && draft.body.length <= 2000) return { id: draft.id, title: draft.title, body: draft.body };
   } catch { /* An unavailable or outdated local draft must not block a new idea. */ }
   return null;
 }
