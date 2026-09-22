@@ -72,6 +72,7 @@ describe('Community operations against the real route and SQLite schema', () => 
     state.user = 'bob';
     assert.equal((await setProfile(' أحمد ')).status, 409);
     assert.equal((await setProfile('أَحمد')).status, 409);
+    assert.equal((await setProfile('احمد')).status, 409);
     assert.equal((await setProfile('محمد')).status, 200);
 
     state.user = 'alice';
