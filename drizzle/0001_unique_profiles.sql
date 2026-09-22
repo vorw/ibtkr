@@ -1,4 +1,4 @@
-CREATE TABLE `profiles` (
+CREATE TABLE IF NOT EXISTS `profiles` (
   `user_id` text PRIMARY KEY NOT NULL,
   `display_name` text NOT NULL,
   `name_key` text NOT NULL,
@@ -6,7 +6,7 @@ CREATE TABLE `profiles` (
   `updated_at` text NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_profiles_name_key` ON `profiles` (`name_key`);
+CREATE UNIQUE INDEX IF NOT EXISTS `idx_profiles_name_key` ON `profiles` (`name_key`);
 --> statement-breakpoint
 WITH legacy_names AS (
   SELECT user_id, name, created_at FROM ideas
