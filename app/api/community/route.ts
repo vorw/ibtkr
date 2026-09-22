@@ -13,6 +13,42 @@ type IdeaRow = Omit<Idea, 'isOwn' | 'liked' | 'comments'> & { user_id: string; l
 type CommentRow = Omit<Comment, 'isOwn'> & { user_id: string; idea_id: string };
 type ProfileRow = { display_name: string; name_key: string };
 
+let profilesSchemaReady: Promise<void> | null = null;
+async function ensureProfilesSchema(db: D1Database): Promise<void> {
+  if (!profilesSchemaReady) {
+    profilesSchemaReady = (async () => {
+      await db.prepare(`CREATE TABLE IF NOT EXISTS profiles (
+        user_id text PRIMARY KEY NOT NULL,
+        display_name text NOT NULL,
+        name_key text NOT NULL,
+        created_at text NOT NULL,
+        updated_at text NOT NULL
+      )`).run();
+      await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_name_key ON profiles (name_key)').run();
+      await db.prepare(`WITH legacy_names AS (
+        SELECT user_id, name, created_at FROM ideas
+        UNION ALL
+        SELECT user_id, name, created_at FROM comments
+      ),
+      ranked_names AS (
+        SELECT user_id, name, created_at,
+          ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, name DESC) AS position
+        FROM legacy_names
+      )
+      INSERT OR IGNORE INTO profiles (user_id,display_name,name_key,created_at,updated_at)
+      SELECT user_id,trim(name),lower(trim(replace(name,'ـ',''))),created_at,created_at
+      FROM ranked_names
+      WHERE position=1 AND length(trim(name))>=2`).run();
+    })();
+  }
+  try {
+    await profilesSchemaReady;
+  } catch (error) {
+    profilesSchemaReady = null;
+    throw error;
+  }
+}
+
 async function getProfile(db: D1Database, userId: string): Promise<ProfileRow | null> {
   return db.prepare('SELECT display_name,name_key FROM profiles WHERE user_id=?').bind(userId).first<ProfileRow>();
 }
@@ -64,6 +100,7 @@ export async function GET(request: Request) {
   try {
     const user = await getParticipant(request);
     if (!user) return reply({ signedIn: false, ideas: [], progress: { xp: 0, ideas: 0, reviews: 0 }, profile: null });
+    await ensureProfilesSchema(database());
     return reply(await readCommunity(user.userId));
   } catch (error) {
     console.error('Community load', error);
@@ -100,6 +137,7 @@ export async function POST(request: Request) {
 
     const value = parsed.data;
     const db = database();
+    await ensureProfilesSchema(db);
     const now = new Date().toISOString();
 
     if (value.action === 'profile') {
