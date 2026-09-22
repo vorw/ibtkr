@@ -422,14 +422,14 @@ export default function InnovationApp() {
 
     <Dialog open={Boolean(data.signedIn && !loading && !data.profile)}>
       <DialogContent className="ftc-dialog profile-setup" dir="rtl" showCloseButton={false} onEscapeKeyDown={(event) => event.preventDefault()} onPointerDownOutside={(event) => event.preventDefault()}>
-        <div className="dialog-sequence"><span>خطوة واحدة</span><span>حسابك في ابتكر</span></div>
+        <div className="dialog-sequence"><span>خطوة واحدة</span></div>
         <DialogTitle className="dialog-title">وش تحب يكون اسمك هنا؟</DialogTitle>
         <DialogDescription className="dialog-description">هذا الاسم بيظهر مع أفكارك ومساهماتك، وما يقدر شخص ثاني يستخدمه.</DialogDescription>
         <form className="idea-form" onSubmit={saveProfile}>
-          <div className="form-field"><label htmlFor="first-profile-name">الاسم الظاهر</label><Input id="first-profile-name" autoComplete="nickname" autoFocus required minLength={2} maxLength={30} disabled={busy} value={profileName} placeholder="مثال: Louis أو سعود" onChange={(event) => { setProfileName(event.target.value); setProfileError(''); }} /></div>
+          <div className="form-field"><label htmlFor="first-profile-name">الاسم الظاهر</label><Input id="first-profile-name" autoComplete="nickname" autoFocus required minLength={2} maxLength={30} disabled={busy} value={profileName} placeholder="وش نناديك؟" onChange={(event) => { setProfileName(event.target.value); setProfileError(''); }} /></div>
           <p className="auth-hint">من حرفين إلى 30 حرفًا. تقدر تغيّره لاحقًا من صفحة رحلتك.</p>
           {profileError && <p className="form-error" role="alert">{profileError}</p>}
-          <div className="form-footer"><span><Users size={17} /> اسم واحد لكل عضو</span><Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'ثبّت اسمي'} <ArrowUpLeft size={20} /></Button></div>
+          <div className="form-footer"><Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'ثبّت اسمي'} <ArrowUpLeft size={20} /></Button></div>
         </form>
       </DialogContent>
     </Dialog>
