@@ -5,7 +5,9 @@ export const state = { user: null, db: null, failReads: false, failReadAfterWrit
 export function resetDatabase() {
   state.db?.close();
   state.db = new DatabaseSync(':memory:');
-  state.db.exec(readFileSync(new URL('../drizzle/0000_purple_toad.sql', import.meta.url), 'utf8'));
+  for (const file of ['../drizzle/0000_purple_toad.sql', '../drizzle/0001_unique_profiles.sql']) {
+    state.db.exec(readFileSync(new URL(file, import.meta.url), 'utf8'));
+  }
   state.user = 'alice'; state.failReads = false; state.failReadAfterWrite = false;
 }
 export async function getParticipant() {
