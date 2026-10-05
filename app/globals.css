@@ -487,3 +487,5 @@ body, .site-header, .mission-hero, .player-panel, .achievement-panel, .profile-n
 @media (max-width: 760px) {
   .search-field input, .filter-selects [data-slot="native-select"] { font-size: 1rem; }
 }
+
+.angle-invitation { margin: 0 0 24px; padding: 18px 20px; border: 1px dashed var(--line); color: var(--soft); font-size: .9375rem; line-height: 1.85; }

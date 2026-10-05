@@ -138,7 +138,8 @@ export default function InnovationApp() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [filter, setFilter] = useState('all');
-  const [missionIndex, setMissionIndex] = useState(0);
+  const [missionIndex, setMissionIndex] = useState<number | null>(null);
+  const [choosingAngle, setChoosingAngle] = useState(false);
   const [weekFilter,setWeekFilter]=useState('current');
   const [angleFilter,setAngleFilter]=useState('all');
   const [sort,setSort]=useState('newest');
@@ -157,7 +158,7 @@ export default function InnovationApp() {
   const pendingResume = useRef<Resume | null>(null);
   const active = data.focusedIdea?.id===selected ? data.focusedIdea : openedIdea?.id===selected?openedIdea: data.ideas.find((idea) => idea.id === selected);
   const mission = data.weekly.current ?? (loading ? currentChallenge() : null);
-  const angle=mission?.angles[missionIndex]??mission?.angles[0];
+  const angle=missionIndex === null ? undefined : mission?.angles[missionIndex];
   const headline=mission?.title.match(/^(.*?[؟…])\s*(.*)$/);
   const feed=data.ideas;
   const remaining=mission?Math.max(0,new Date(mission.endsAt).getTime()-tick):0;
@@ -226,7 +227,10 @@ export default function InnovationApp() {
     else if (idea && resume.edit && idea.isOwn && findWeek(idea.challenge_id)) start(findWeek(idea.challenge_id)!, idea);
     else if (idea) openIdea(idea);
     else if (data.signedIn && (resume.idea || resume.edit)) toast.error('هذه الفكرة غير متاحة في القائمة الحالية.');
-    if (data.signedIn) window.history.replaceState(null, '', '/?view=' + resume.view);
+    if (data.signedIn) {
+      const destination = challenge && !challenge.angles.some(item => item.id === resume.angle) ? 'home' : resume.view;
+      window.history.replaceState(null, '', '/?view=' + destination);
+    }
   }, [data, error, loading]);
 
   useEffect(() => {
@@ -247,6 +251,23 @@ export default function InnovationApp() {
   useEffect(()=>{const timer=setTimeout(()=>{if(!selected)setLoading(true);void refresh();},search?250:0);return()=>clearTimeout(timer);},[queryKey,refresh]);
   useEffect(()=>{const timer=setInterval(()=>{setTick(Date.now());if(document.visibilityState==='visible'&&(tab==='leaderboard'||tab==='ideas'))void refresh();},30000);return()=>clearInterval(timer);},[tab,refresh]);
   useEffect(()=>{if(mission && remaining===0)void refresh();},[mission?.id,remaining===0,refresh]);
+
+  useEffect(() => { setMissionIndex(null); }, [mission?.id]);
+  useEffect(() => {
+    if (!choosingAngle || tab !== 'home' || !mission) return;
+    const frame = requestAnimationFrame(() => {
+      const first = document.querySelector<HTMLButtonElement>('.mission-options button');
+      first?.scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+      first?.focus({ preventScroll: true });
+      setChoosingAngle(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [choosingAngle, tab, mission?.id]);
+
+  function chooseAngle() {
+    setChoosingAngle(true);
+    if (tab !== 'home') changeTab('home');
+  }
 
   function changeTab(value: string) {
     if (!nav.some(item => item.id === value)) return;
@@ -280,9 +301,12 @@ export default function InnovationApp() {
       else (document.querySelector('.main-nav [data-state="active"]') as HTMLElement | null)?.focus({ preventScroll: true });
     });
   }
-  function start(challenge: Challenge, idea?: Idea, angleId=angle?.id??challenge.angles[0].id) {
+  function start(challenge: Challenge, idea?: Idea, angleId=angle?.id) {
     if(currentChallenge()?.id!==challenge.id){toast.error('أُغلق هذا التحدّي. انتظر تحدّي الأسبوع القادم.');return;}
-    if(idea)angleId=idea.angle_id??angleId;
+    const chosen = challenge.angles.find(item => item.id === (idea?.angle_id ?? angleId));
+    if (!chosen) { chooseAngle(); return; }
+    angleId = chosen.id;
+    setMissionIndex(challenge.angles.findIndex(item => item.id === chosen.id));
     rememberOrigin(); setSelected(null); setEditing(Boolean(idea)); setFormError('');
     const saved = readIdeaDraft(storage.get(idea ? 'ftc-edit-' + idea.id : 'ftc-draft-' + challenge.id + '-' + angleId));
     const value: Draft = saved && (!idea || saved.id === idea.id) ? saved : idea
@@ -414,12 +438,12 @@ export default function InnovationApp() {
               <div className="hero-grid" aria-hidden="true"/>
               <div className="mission-topline"><span className="week-marker"><span>الأسبوع</span><b className="week-number" dir="ltr">{mission.number}</b></span><span className="week-status"><Clock3 size={15}/> ينتهي الثلاثاء، ١١:٥٩ م</span></div>
               <div className="mission-copy"><span className="mission-type">{mission.category}</span><h1>{headline ? <><span>{headline[1]}</span><span>{headline[2]}</span></> : mission.title}</h1><p>{mission.description}</p></div>
-              <div className="selected-angle" key={angle?.id}><span className={`angle-tag tone-${palette[missionIndex]}`}>{angle?.label}</span><p>{angle?.prompt}</p></div>
-              <div className="mission-controls"><Button className="launch-button" onClick={()=>start(mission)}>شارك حلّك</Button></div>
+              <div aria-live="polite">{angle ? <div className="selected-angle" key={angle.id}><span className={`angle-tag tone-${palette[mission.angles.indexOf(angle)]}`}>{angle.label}</span><p>{angle.prompt}</p></div> : <p className="angle-invitation">اختر زاوية من القائمة، وبيظهر سؤالها هنا.</p>}</div>
+              <div className="mission-controls"><Button className="launch-button" onClick={()=>start(mission)}>{angle ? 'شارك حلّك' : 'اختر زاويتك'}</Button></div>
               <div className="mission-footer"><span>تقدر تشارك بأكثر من حل، وفي أكثر من زاوية.</span><span className="weekly-countdown" aria-label="الوقت المتبقي">{timeLeft}</span></div>
             </article>
             <aside className="command-stack">
-              <section className="mission-selector"><div className="panel-top"><h2>من أي زاوية تبدأ؟</h2><span dir="ltr">01—03</span></div><div className="mission-options">{mission.angles.map((item,index)=>{const Icon=icons[item.icon];return <button key={item.id} className={`mission-option tone-${palette[index]}`} aria-pressed={missionIndex===index} onClick={()=>setMissionIndex(index)}><span className="option-number">0{index+1}</span><span className="option-copy"><strong>{item.label}</strong><small>{index===missionIndex?'زاويتك المختارة':'نفس المشكلة، منظور مختلف'}</small></span><Icon size={20} strokeWidth={1.5}/></button>})}</div><div className="angle-hint" key={angle?.id}><Lightbulb size={18}/><p>{angle?.hint}</p></div></section>
+              <section className="mission-selector"><div className="panel-top"><h2>من أي زاوية تبدأ؟</h2><span dir="ltr">01—03</span></div><div className="mission-options">{mission.angles.map((item,index)=>{const Icon=icons[item.icon];return <button key={item.id} className={`mission-option tone-${palette[index]}`} aria-pressed={missionIndex===index} onClick={()=>setMissionIndex(index)}><span className="option-number">0{index+1}</span><span className="option-copy"><strong>{item.label}</strong><small>{index===missionIndex?'زاويتك المختارة':angle?'نفس المشكلة، منظور مختلف':'اختر هالزاوية'}</small></span><Icon size={20} strokeWidth={1.5}/></button>})}</div><div className="angle-hint" key={angle?.id}><Lightbulb size={18}/><p>{angle?.hint ?? 'كل زاوية تفتح لك طريقة مختلفة للحل.'}</p></div></section>
               <section className="weekly-score-panel"><Trophy size={23}/><div><small>{data.signedIn?'مشاركتك هذا الأسبوع':'مبتكر الأسبوع'}</small><strong>{data.signedIn?`${data.weekly.ownEntries} مشاركة · ${data.weekly.ownLikes} إعجاب`:'باختيار المجتمع'}</strong></div><button className="panel-link" onClick={()=>changeTab('leaderboard')}>شاهد المتصدرين</button></section>
             </aside>
           </section> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
@@ -458,7 +482,7 @@ export default function InnovationApp() {
     </Dialog>
 
 
-    <Dialog open={Boolean(compose)} onOpenChange={(open) => { if (!open && !busy) setCompose(null); }}><DialogContent className="ftc-dialog composer" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose><div className="dialog-sequence"><span>{editing ? 'تطوير الفكرة' : 'بدايتك الجديدة'}</span><span>الأسبوع {compose?.number}</span></div><DialogTitle className="dialog-title">{editing ? 'خطوة أخرى لفكرتك.' : 'اكتبها كما هي الآن.'}</DialogTitle><DialogDescription className="dialog-description">{compose?.short}</DialogDescription><form className="idea-form" onSubmit={saveIdea}><div className="form-field"><label htmlFor="compose-angle">زاوية الحل</label><NativeSelect id="compose-angle" disabled={busy} value={draft.angleId??compose?.angles[0].id} onChange={event=>{if(editing)setDraft({...draft,angleId:event.target.value});else if(compose)start(compose,undefined,event.target.value)}}>{compose?.angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect><p className="compose-prompt">{compose?.angles.find(item=>item.id===draft.angleId)?.prompt}</p></div><div className="form-field"><label htmlFor="idea-title">عنوان الفكرة</label><Input id="idea-title" disabled={busy} required minLength={2} maxLength={100} value={draft.title} placeholder="اسم قصير وواضح" onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div className="form-field"><label htmlFor="idea-body">فكرتك <small>لا تحتاج إلى حل مكتمل</small></label><Textarea id="idea-body" disabled={busy} required minLength={10} maxLength={2000} rows={4} value={draft.body} placeholder="ما الذي ستغيّره؟ وكيف تعمل فكرتك؟" aria-describedby="draft-helper" onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></div><div className="form-helper" id="draft-helper"><span>{editing ? 'تقدر تعدّل حتى إغلاق التحدّي.' : 'مسودتك تُحفظ على هذا الجهاز.'}</span><span dir="ltr">{draft.body.length} / 2000</span></div>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="form-footer"><span><Lightbulb size={17} /> البداية أهم من الكمال</span>{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : editing ? 'احفظ التطوير' : 'شارك الفكرة'} <ArrowUpLeft size={20} /></Button> : <a className="launch-button signin-button" href={signInHref({ view: tab, ...(editing ? { edit: draft.id } : { compose: compose?.id, angle:draft.angleId }) })} target="_top">دخول للمشاركة <ArrowUpLeft size={20} /></a>}</div></form></DialogContent></Dialog>
+    <Dialog open={Boolean(compose)} onOpenChange={(open) => { if (!open && !busy) setCompose(null); }}><DialogContent className="ftc-dialog composer" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose><div className="dialog-sequence"><span>{editing ? 'تطوير الفكرة' : 'بدايتك الجديدة'}</span><span>الأسبوع {compose?.number}</span></div><DialogTitle className="dialog-title">{editing ? 'خطوة أخرى لفكرتك.' : 'اكتبها كما هي الآن.'}</DialogTitle><DialogDescription className="dialog-description">{compose?.short}</DialogDescription><form className="idea-form" onSubmit={saveIdea}><div className="form-field"><label htmlFor="compose-angle">زاوية الحل</label><NativeSelect id="compose-angle" disabled={busy} value={draft.angleId ?? ''} onChange={event=>{if(editing)setDraft({...draft,angleId:event.target.value});else if(compose)start(compose,undefined,event.target.value)}}>{compose?.angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect><p className="compose-prompt">{compose?.angles.find(item=>item.id===draft.angleId)?.prompt}</p></div><div className="form-field"><label htmlFor="idea-title">عنوان الفكرة</label><Input id="idea-title" disabled={busy} required minLength={2} maxLength={100} value={draft.title} placeholder="اسم قصير وواضح" onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div className="form-field"><label htmlFor="idea-body">فكرتك <small>لا تحتاج إلى حل مكتمل</small></label><Textarea id="idea-body" disabled={busy} required minLength={10} maxLength={2000} rows={4} value={draft.body} placeholder="ما الذي ستغيّره؟ وكيف تعمل فكرتك؟" aria-describedby="draft-helper" onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></div><div className="form-helper" id="draft-helper"><span>{editing ? 'تقدر تعدّل حتى إغلاق التحدّي.' : 'مسودتك تُحفظ على هذا الجهاز.'}</span><span dir="ltr">{draft.body.length} / 2000</span></div>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="form-footer"><span><Lightbulb size={17} /> البداية أهم من الكمال</span>{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : editing ? 'احفظ التطوير' : 'شارك الفكرة'} <ArrowUpLeft size={20} /></Button> : <a className="launch-button signin-button" href={signInHref({ view: tab, ...(editing ? { edit: draft.id } : { compose: compose?.id, angle:draft.angleId }) })} target="_top">دخول للمشاركة <ArrowUpLeft size={20} /></a>}</div></form></DialogContent></Dialog>
 
     <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open && !busy) setSelected(null); }}><DialogContent className="ftc-dialog idea-dialog" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose>{active && <><div className="dialog-sequence"><span>من المجتمع</span><span>{angleLabel(active.angle_id)}</span></div><DialogTitle className="dialog-title">{active.title}</DialogTitle><DialogDescription className="idea-author">فكرة {active.name} · {date(active.created_at)}</DialogDescription><p className="full-idea">{active.body}</p><div className="idea-detail-actions">{!data.signedIn && <a className="text-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتشجيع والمشاركة <ArrowUpLeft size={18} /></a>}<button className={active.liked ? 'liked' : ''} aria-pressed={active.liked} disabled={busy || active.isOwn || !data.signedIn || currentChallenge()?.id!==active.challenge_id} title={active.isOwn ? 'هذه فكرتك؛ شجّع أفكار المشاركين الآخرين.' : undefined} onClick={() => void react(active)}><Heart size={18} fill={active.liked ? 'currentColor' : 'none'} />{active.likes} تشجيع</button>{active.isOwn && currentChallenge()?.id===active.challenge_id && <button onClick={() => start(findWeek(active.challenge_id)!, active)}><Pencil size={17} /> طوّر الفكرة</button>}</div><div className="comments-section"><h3>النقاش <span>{active.commentCount}</span></h3>{active.comments.length ? active.comments.map((entry) => <div className="comment" key={entry.id}><div><strong>{entry.name}</strong><time dateTime={entry.created_at}>{date(entry.created_at)}</time></div><p>{entry.body}</p></div>) : <p className="muted">سؤال صغير أو اقتراح منك قد يغيّر الفكرة.</p>}<PageControls page={data.discussion?.page??1} pages={data.discussion?.pages??1} onPage={setCommentPage}/><form onSubmit={saveComment} className="comment-form"><label htmlFor="comment-body">تعليقك</label><Textarea id="comment-body" disabled={busy} required minLength={5} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="سؤال أو اقتراح يحرّك الفكرة…" />{formError && <p className="form-error" role="alert">{formError}</p>}{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'أضف التعليق'} <MessageCircle size={18} /></Button> : <a className="launch-button signin-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتعليق <ArrowUpLeft size={18} /></a>}</form></div></>}</DialogContent></Dialog>
   </>;
