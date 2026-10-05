@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, describe, test, mock } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { registerHooks } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { state, resetDatabase } from './community-fixture.mjs';
 
 // Isolated test identities and SQLite; no production headers, account, or database are changed.
@@ -13,11 +14,15 @@ registerHooks({ resolve(specifier, context, next) {
     '@/lib/profile': '../lib/profile.ts',
     '@/lib/weekly':'../lib/weekly.ts',
     '@/lib/community-read':'../lib/community-read.ts',
+    '@/lib/weekly-schema':'../lib/weekly-schema.ts',
     './weekly':'../lib/weekly.ts',
     './weekly-db':'../lib/weekly-db.ts',
   };
   if (aliases[specifier]) return { url: new URL(aliases[specifier], import.meta.url).href, shortCircuit: true };
   return next(specifier, context);
+}, load(url, context, next) {
+  if(url.endsWith('.sql?raw'))return {format:'module',source:'export default '+JSON.stringify(readFileSync(new URL(url),'utf8'))+';',shortCircuit:true};
+  return next(url,context);
 } });
 
 const { GET, POST } = await import('../app/api/community/route.ts');
@@ -60,6 +65,39 @@ describe('Community operations against the real route and SQLite schema', () => 
 
   afterEach(() => mock.timers.reset());
   after(() => state.db?.close());
+
+  test('GitHub-only release upgrades the old schema atomically and preserves archived data',async()=>{
+    resetDatabase({weekly:false});
+    const id=randomUUID();state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?)').run(id,'alice','queue','أحمد','فكرة سابقة','شرح محفوظ من البرنامج السابق.','2026-09-22T00:00:00.000Z');
+    const data=await read('week=legacy');assert.equal(data.signedIn,true);assert.equal(data.ideas[0].id,id);assert.equal(data.ideas[0].angle_id,null);
+    assert.ok(state.db.prepare('PRAGMA table_info(ideas)').all().some(row=>row.name==='angle_id'));
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations WHERE name=?').get('0002_weekly_challenges.sql').n,1);
+    await read();assert.equal(state.db.prepare('SELECT COUNT(*) n FROM ideas').get().n,1);
+  });
+
+  test('a failed automatic upgrade rolls back the schema and can safely retry',async()=>{
+    resetDatabase({weekly:false});
+    const {ensureWeeklySchema}=await import('../lib/weekly-schema.ts');const {database}=await import('./community-fixture.mjs');
+    const original=database();let fail=true;
+    const db={...original,prepare(sql){
+      if(fail && sql.startsWith('INSERT OR IGNORE INTO d1_migrations'))return {bind(){return {async run(){throw Error('Simulated migration recording failure');}}}};
+      return original.prepare(sql);
+    }};
+    await assert.rejects(ensureWeeklySchema(db),/recording failure/);
+    assert.ok(!state.db.prepare('PRAGMA table_info(ideas)').all().some(row=>row.name==='angle_id'));
+    assert.equal(state.db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='weekly_results'").get().n,0);
+    fail=false;await ensureWeeklySchema(db);
+    assert.ok(state.db.prepare('PRAGMA table_info(ideas)').all().some(row=>row.name==='angle_id'));
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations').get().n,1);
+  });
+
+  test('concurrent new Worker instances upgrade once without duplicate columns',async()=>{
+    resetDatabase({weekly:false});
+    const {ensureWeeklySchema}=await import('../lib/weekly-schema.ts');const {database}=await import('./community-fixture.mjs');
+    await Promise.all([ensureWeeklySchema(database()),ensureWeeklySchema(database()),ensureWeeklySchema(database())]);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations WHERE name=?').get('0002_weekly_challenges.sql').n,1);
+    assert.equal(state.db.prepare('PRAGMA table_info(ideas)').all().filter(row=>row.name==='angle_id').length,1);
+  });
 
   test('signed-out writes require identity; reads explicitly identify the guest', async () => {
     state.user = null;

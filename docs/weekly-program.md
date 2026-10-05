@@ -34,9 +34,11 @@ Previous `queue`, `reverse` and `alone` entries remain in the archive. They reta
 
 `drizzle/0002_weekly_challenges.sql` adds the angle field, feed indexes, frozen weekly results and finalization markers. It does not delete or reassign existing data. Finalization inserts rankings and the marker in one transactional D1 batch and is repeat-safe. Server-side clock guards prevent late entry/edit/vote writes even if the client remains open at the cutoff.
 
-The production target is the existing Cloudflare Worker `ibtkr`, D1 `ibtkr-community` and domain `ibtkr.space`. Production has not been changed in this working session. Do not deploy to the former Sites project.
+The production target is the existing Cloudflare Worker `ibtkr`, D1 `ibtkr-community` and domain `ibtkr.space`, connected to GitHub `main`. Do not deploy to the former Sites project.
 
-An authorized Cloudflare owner releases with:
+Merge the verified GitHub release to `main` to use the existing connected Cloudflare build. `ensureWeeklySchema` imports the real 0002 SQL migration, applies it in a transactional D1 batch before weekly queries, and records it in the standard Wrangler migration ledger. Already-applied schema and concurrent first requests are handled safely. A failed upgrade rolls back and remains retryable. Existing data is neither deleted nor reassigned.
+
+An authenticated CLI release remains available:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -46,7 +48,7 @@ pnpm exec tsc --noEmit
 pnpm deploy
 ```
 
-`pnpm deploy` builds, applies remote migrations and then deploys the Worker. Apply the additive migration before deploying the new Worker. Confirm the scheduled handler and cron configuration after deployment. No deployment credentials are stored in source.
+`pnpm deploy` builds, applies remote migrations and then deploys the Worker. The automatic Worker upgrade also covers deployments that only publish code. Confirm the scheduled handler and cron configuration after deployment. No deployment credentials are stored in source.
 
 ## Verification
 

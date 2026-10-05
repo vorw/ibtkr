@@ -2,6 +2,7 @@ import { getParticipant } from '@/lib/auth-server';
 import { database } from '@/lib/database';
 import { type Comment, type Idea } from '@/lib/challenges';
 import { readCommunity } from '@/lib/community-read';
+import { ensureWeeklySchema } from '@/lib/weekly-schema';
 import { findWeek, currentChallenge } from '@/lib/weekly';
 import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
     const user = await getParticipant(request);
     const db=database();
     await ensureProfilesSchema(db);
+    await ensureWeeklySchema(db);
     return reply(await readCommunity(db,user?.userId??null,new URL(request.url).searchParams));
   } catch (error) {
     console.error('Community load', error);
@@ -97,6 +99,7 @@ export async function POST(request: Request) {
     const value = parsed.data;
     const db = database();
     await ensureProfilesSchema(db);
+    await ensureWeeklySchema(db);
     const now = new Date().toISOString();
 
     if (value.action === 'profile') {
@@ -208,4 +211,3 @@ export async function POST(request: Request) {
     return reply({ error: 'ما تأكدنا من الحفظ. كلامك موجود؛ جرّب مرة ثانية ولن تتكرر المشاركة.' }, 503);
   }
 }
-

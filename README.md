@@ -10,7 +10,7 @@ See [weekly programme and release notes](docs/weekly-program.md) and [verificati
 
 ## Status
 
-This weekly update is prepared for review, not deployed. The production domain, Worker and D1 database have not been modified by this change. Automated authentication/community checks, TypeScript checking and the production build are the release checks. Visual browser QA and an authorized Cloudflare deployment remain pending.
+This release is verified with automated authentication/community checks, TypeScript and a production build. Confirm deployment status and the live domain after a GitHub release. Visual browser QA and production sign-in checks complement the isolated automated suite.
 
 ## Development
 
@@ -31,7 +31,7 @@ Local configuration overrides can be placed in ignored `.dev.vars`. Runtime publ
 
 The existing target is Cloudflare Worker `ibtkr`, D1 database `ibtkr-community`, and custom domain `ibtkr.space`. Preserve the configured binding and database ID in `wrangler.json`. Do not publish this update to the former Sites hostname or recreate the production database.
 
-An authorized owner runs `pnpm deploy` after reviewing the weekly update. The deployment script builds, applies remote D1 migrations, then deploys the Worker. The new migration is additive and must run before the new Worker. Verify the configured Tuesday 21:00 UTC cron, the live domain, authentication and mobile/desktop behavior after release.
+Production is connected to the GitHub `main` branch. Merge a verified release into `main` to trigger the existing Cloudflare build. The Worker applies the additive weekly migration transactionally before its first weekly query or scheduled job, preserves old records, and records migration 0002 for Wrangler. The upgrade is repeat-safe across concurrent instances. An authenticated CLI release can also use `pnpm deploy`, which builds, applies pending remote migrations, then deploys. Verify the configured Tuesday 21:00 UTC cron, the live domain, authentication and mobile/desktop behavior after release.
 
 Existing production ideas, comments, reactions and profiles must remain intact. Previous three-problem entries stay accessible in the community archive and do not count toward weekly competitions. Local drafts on the same hostname are preserved and matching older problem drafts can be resumed in the new angle composer.
 
