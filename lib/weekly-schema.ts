@@ -1,4 +1,5 @@
 import migration from '../drizzle/0002_weekly_challenges.sql?raw';
+import legacyReset from '../drizzle/0003_clear_legacy_activity.sql?raw';
 
 const migrationName = '0002_weekly_challenges.sql';
 const ready = new WeakMap<D1Database, Promise<void>>();
@@ -10,10 +11,21 @@ const statements = migration.split('--> statement-breakpoint').map(sql => sql.tr
 export async function ensureWeeklySchema(db: D1Database): Promise<void> {
   let task = ready.get(db);
   if (!task) {
-    task = upgrade(db);
+    task = upgrade(db).then(() => clearLegacyActivity(db));
     ready.set(db, task);
   }
   try { await task; } catch (error) { ready.delete(db); throw error; }
+}
+
+async function clearLegacyActivity(db: D1Database) {
+  const name = '0003_clear_legacy_activity.sql';
+  if (await db.prepare('SELECT name FROM d1_migrations WHERE name=?').bind(name).first()) return;
+  // Children, parents and marker change atomically. Points and achievements
+  // derive from remaining activity; profiles and authentication stay untouched.
+  await db.batch([
+    ...legacyReset.split('--> statement-breakpoint').map(sql => sql.trim()).filter(Boolean).map(sql => db.prepare(sql)),
+    db.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind(name),
+  ]);
 }
 
 async function upgrade(db: D1Database) {

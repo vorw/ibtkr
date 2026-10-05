@@ -8,7 +8,7 @@
 - Voting is one like per other participant’s idea. Participants cannot like their own entries. Likes across all entries are summed for the participant’s weekly score.
 - Ranking uses shared ranks for equal scores. All first-place participants with at least one like are weekly winners; zero likes do not create a winner.
 - Closed weeks preserve their result. Creating, editing and changing votes are locked; archive discussion remains available.
-- Lifetime XP is separate: 20 XP for the first participation in a week and 5 XP for the first comment on each other participant’s idea, preserving previous progress.
+- Lifetime XP is separate: 20 XP for the first participation in a week and 5 XP for the first comment on each other participant’s idea, excluding reset legacy participation.
 
 ## Schedule
 
@@ -28,7 +28,7 @@ Content lives in `lib/weekly.ts`. Add reviewed future problems before their star
 
 The community uses 12-entry pages, search across title/body/author, week and angle filters, newest/most-liked sorting, and an all/my-participations switch. Rankings use 20-participant pages; discussions use 20-comment pages. Individual saved ideas can be opened even when they are outside the visible filtered page. This replaces the former latest-100 limit.
 
-Previous `queue`, `reverse` and `alone` entries remain in the archive. They retain comments, likes and ownership, but are excluded from the weekly competition. Matching old local drafts resume in the corresponding weekly angle and are only cleared after a confirmed save.
+The user requested removal of previous `queue`, `reverse` and `alone` participation. Migration 0003 removes those posts, their comments/likes and obsolete results in one guarded transaction, then records the reset in the migration ledger. Profiles, auth accounts, new weekly posts and their rewards remain intact. Old and previously migrated local drafts are cleared without clearing login tokens. The obsolete previous-programme filter is removed; completed weekly archives remain available.
 
 ## Data and release
 
@@ -36,7 +36,7 @@ Previous `queue`, `reverse` and `alone` entries remain in the archive. They reta
 
 The production target is the existing Cloudflare Worker `ibtkr`, D1 `ibtkr-community` and domain `ibtkr.space`, connected to GitHub `main`. Do not deploy to the former Sites project.
 
-Merge the verified GitHub release to `main` to use the existing connected Cloudflare build. `ensureWeeklySchema` imports the real 0002 SQL migration, applies it in a transactional D1 batch before weekly queries, and records it in the standard Wrangler migration ledger. Already-applied schema and concurrent first requests are handled safely. A failed upgrade rolls back and remains retryable. Existing data is neither deleted nor reassigned.
+Merge the verified GitHub release to `main` to use the existing connected Cloudflare build. `ensureWeeklySchema` imports the real 0002 SQL migration, applies it in a transactional D1 batch before weekly queries, and records it in the standard Wrangler migration ledger. Already-applied schema and concurrent first requests are handled safely. A failed upgrade rolls back and remains retryable. Migration 0003 then applies the user-authorized legacy reset, including on GitHub-only deployments. Its marker and deletions are atomic; failed resets roll back and retry, while concurrent instances cannot reset new weekly data.
 
 An authenticated CLI release remains available:
 
@@ -52,9 +52,9 @@ pnpm deploy
 
 ## Verification
 
-The isolated SQLite tests use the real migrations and route handlers. They cover multi-angle submissions, ownership, retry recovery, deadline enforcement, vote uniqueness, cumulative scores and ties, archive preservation, 126-entry pagination, 140-participant rankings, 55-comment pagination, frozen results and exact Riyadh week rollover. No production accounts or data are used.
+The isolated SQLite tests use the real migrations and route handlers. They cover multi-angle submissions, ownership, retry recovery, deadline enforcement, vote uniqueness, cumulative scores and ties, account preservation and legacy cleanup, 126-entry pagination, 140-participant rankings, 55-comment pagination, frozen results and exact Riyadh week rollover. No production accounts or data are used.
 
-Visual browser QA is pending: the managed browser-control skill was unavailable. Check desktop and mobile, light and dark themes, navigation transitions, angle selection, composer recovery, filters/pages, voting, ranking and archive states before announcing the release.
+The weekly release was verified on the live homepage, three-angle switching, challenge details, public rankings and guest community filters. Signed-in writes and account preservation are covered by the isolated automated suite. Mobile visual review remains a manual check.
 
 ## Platform references
 

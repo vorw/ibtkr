@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { readResume, signInHref, readIdeaDraft, type IdeaDraft, type Page, type Resume } from '@/lib/participation';
+import { readResume, signInHref, readIdeaDraft, clearLegacyDrafts, type IdeaDraft, type Page, type Resume } from '@/lib/participation';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster } from '@/components/ui/sonner';
@@ -173,6 +173,7 @@ export default function InnovationApp() {
     try {
       const result = await requestCommunity(undefined,queryRef.current) as AppData;
       if (version !== refreshVersion.current) return null;
+      if (result.activityVersion) { try { clearLegacyDrafts(localStorage); } catch {} }
       setData(result); setError(''); return result;
     } catch (caught) {
       if (version === refreshVersion.current) {
@@ -284,10 +285,7 @@ export default function InnovationApp() {
     if(currentChallenge()?.id!==challenge.id){toast.error('أُغلق هذا التحدّي. انتظر تحدّي الأسبوع القادم.');return;}
     if(idea)angleId=idea.angle_id??angleId;
     rememberOrigin(); setDetail(null); setSelected(null); setEditing(Boolean(idea)); setFormError('');
-    let saved = readIdeaDraft(storage.get(idea ? 'ftc-edit-' + idea.id : 'ftc-draft-' + challenge.id + '-' + angleId));
-    const legacyDrafts:Record<string,{key:string;angle:string}>={'week-2026-09-30':{key:'ftc-draft-queue',angle:'change'},'week-2026-10-07':{key:'ftc-draft-reverse',angle:'reverse'},'week-2026-10-14':{key:'ftc-draft-alone',angle:'what-if'}};
-    const legacy=legacyDrafts[challenge.id];
-    if(!saved && !idea && legacy?.angle===angleId){const previous=readIdeaDraft(storage.get(legacy.key));if(previous)saved={...previous,angleId,legacyKey:legacy.key};}
+    const saved = readIdeaDraft(storage.get(idea ? 'ftc-edit-' + idea.id : 'ftc-draft-' + challenge.id + '-' + angleId));
     const value: Draft = saved && (!idea || saved.id === idea.id) ? saved : idea
       ? { id: idea.id, title: idea.title, body: idea.body,angleId:idea.angle_id??angleId }
       : { id: newId(), title: '', body: '',angleId };
@@ -327,7 +325,6 @@ export default function InnovationApp() {
       const result = await mutate({ ...draft, action: editing ? 'edit' : 'idea', challengeId: compose.id });
       const saved = result.focusedIdea??result.ideas.find(idea => idea.id === draft.id)!;
       storage.remove(editing ? 'ftc-edit-' + draft.id : 'ftc-draft-' + compose.id + '-' + draft.angleId);
-      if(draft.legacyKey)storage.remove(draft.legacyKey);
       setCompose(null); openIdea(saved);
       toast.success(editing ? 'تم حفظ تطوير فكرتك.' : 'فكرتك صارت جزءًا من المساحة.', { description: !editing && result.progress.xp-beforeXp>=20 ? '+20 نقطة. بداية تستحق الاحتفاء.' : undefined });
     } catch (caught) { setFormError(handleFailure(caught)); }
@@ -410,7 +407,7 @@ export default function InnovationApp() {
         <div className="header-end"><span className="beta-label">نسخة تجريبية</span><ThemeToggle />{data.signedIn && <button className="header-login" disabled={busy} onClick={() => void logout()}>خروج</button>}{!loading && !data.signedIn ? <a className="header-login" href={signInHref({ view: tab })} target="_top">دخول <ArrowUpLeft size={17} /></a> : <button className="header-xp" onClick={() => changeTab('profile')} aria-label={`رحلتك، ${data.progress.xp} نقطة`}><Sparkles size={15} /><b>{data.progress.xp}</b><span lang="en">XP</span></button>}</div>
       </div></header>
 
-      <main className="workspace" id="main-content" tabIndex={-1}>
+      <main className="workspace" id="main-content" data-activity-version={data.activityVersion} tabIndex={-1}>
         {error && <div className="system-banner error" role="alert"><span>{error}</span><button onClick={() => void refresh()}>إعادة المحاولة</button></div>}
         <TabsContent value="home" className="page-stage">
           <div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>
@@ -432,7 +429,7 @@ export default function InnovationApp() {
         </TabsContent>
 
         <TabsContent value="ideas" className="page-stage"><header className="page-header"><div><span className="eyebrow">حلول المجتمع</span><h1>نفس المشكلة.<br/>أفكار ما تتشابه.</h1></div>{mission&&<Button className="launch-button" onClick={()=>start(mission)}>شارك حلّك <Plus size={20}/></Button>}</header>
-          <div className="community-controls"><div className="search-field"><Search size={18}/><Input aria-label="ابحث بالعنوان أو المشارك" placeholder="ابحث عن فكرة أو مشارك…" value={search} onChange={event=>{setSearch(event.target.value);setPage(1)}}/></div><div className="filter-selects"><label>الأسبوع<NativeSelect value={weekFilter} onChange={event=>{setWeekFilter(event.target.value);setAngleFilter('all');setPage(1);setLeaderPage(1)}}><NativeSelectOption value="current">الأسبوع الحالي</NativeSelectOption>{data.weekly.weeks.map(week=><NativeSelectOption key={week.id} value={week.id}>الأسبوع {week.number} · {week.title}</NativeSelectOption>)}<NativeSelectOption value="all">كل الأسابيع</NativeSelectOption><NativeSelectOption value="legacy">المشاركات السابقة</NativeSelectOption></NativeSelect></label><label>الزاوية<NativeSelect value={angleFilter} onChange={event=>{setAngleFilter(event.target.value);setPage(1)}}><NativeSelectOption value="all">كل الزوايا</NativeSelectOption>{weeklyChallenges[0].angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect></label><label>الترتيب<NativeSelect value={sort} onChange={event=>{setSort(event.target.value);setPage(1)}}><NativeSelectOption value="newest">الأحدث</NativeSelectOption><NativeSelectOption value="popular">الأكثر إعجابًا</NativeSelectOption></NativeSelect></label></div></div>
+          <div className="community-controls"><div className="search-field"><Search size={18}/><Input aria-label="ابحث بالعنوان أو المشارك" placeholder="ابحث عن فكرة أو مشارك…" value={search} onChange={event=>{setSearch(event.target.value);setPage(1)}}/></div><div className="filter-selects"><label>الأسبوع<NativeSelect value={weekFilter} onChange={event=>{setWeekFilter(event.target.value);setAngleFilter('all');setPage(1);setLeaderPage(1)}}><NativeSelectOption value="current">الأسبوع الحالي</NativeSelectOption>{data.weekly.weeks.map(week=><NativeSelectOption key={week.id} value={week.id}>الأسبوع {week.number} · {week.title}</NativeSelectOption>)}<NativeSelectOption value="all">كل الأسابيع</NativeSelectOption></NativeSelect></label><label>الزاوية<NativeSelect value={angleFilter} onChange={event=>{setAngleFilter(event.target.value);setPage(1)}}><NativeSelectOption value="all">كل الزوايا</NativeSelectOption>{weeklyChallenges[0].angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect></label><label>الترتيب<NativeSelect value={sort} onChange={event=>{setSort(event.target.value);setPage(1)}}><NativeSelectOption value="newest">الأحدث</NativeSelectOption><NativeSelectOption value="popular">الأكثر إعجابًا</NativeSelectOption></NativeSelect></label></div></div>
           <Tabs dir="rtl" value={filter} onValueChange={value=>{setFilter(value);setPage(1)}} className="feed-tabs"><div className="feed-toolbar"><TabsList aria-label="تصفية المشاركات"><TabsTrigger value="all">كل المشاركات</TabsTrigger><TabsTrigger value="mine">مشاركاتي</TabsTrigger></TabsList><span aria-live="polite">{loading?'جارٍ التحميل…':`${data.pagination.total} مشاركة`}</span></div><TabsContent value={filter} key={filter+'-'+page} className="feed-content">{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas'})}/>:feed.length?<><div className="idea-grid">{ideaCards(feed)}</div><PageControls page={data.pagination.page} pages={data.pagination.pages} onPage={setPage}/></>:<div className="empty-state"><Lightbulb size={28}/><div><strong>ما فيه مشاركات تطابق اختيارك.</strong><p>جرّب تغيير البحث أو الزاوية، أو ابدأ بحلّك.</p></div><Button className="outline-button" onClick={()=>{setSearch('');setAngleFilter('all');setFilter('all');setPage(1)}}>عرض كل المشاركات</Button></div>}</TabsContent></Tabs>
         </TabsContent>
 

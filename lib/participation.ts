@@ -27,12 +27,30 @@ export function signInHref(resume: Resume): string {
   return `/login?return_to=${encodeURIComponent(`/?${params}`)}`;
 }
 
-export type IdeaDraft = { id: string; title: string; body: string; angleId?: string;legacyKey?:string };
+export type IdeaDraft = { id: string; title: string; body: string; angleId?: string };
 export function readIdeaDraft(value: string | null): IdeaDraft | null {
   try {
     const draft = JSON.parse(value ?? 'null');
-    if (draft && uuid.test(draft.id) && ['title', 'body'].every(key => typeof draft[key] === 'string') && draft.title.length <= 100 && draft.body.length <= 2000) return { id: draft.id, title: draft.title, body: draft.body, ...(['ftc-draft-queue','ftc-draft-reverse','ftc-draft-alone'].includes(draft.legacyKey)?{legacyKey:draft.legacyKey}:{}), ...(typeof draft.angleId === 'string' && ['change','reverse','what-if'].includes(draft.angleId) ? {angleId:draft.angleId} : {}) };
+    if (draft && uuid.test(draft.id) && ['title', 'body'].every(key => typeof draft[key] === 'string') && draft.title.length <= 100 && draft.body.length <= 2000) return { id: draft.id, title: draft.title, body: draft.body, ...(typeof draft.angleId === 'string' && ['change','reverse','what-if'].includes(draft.angleId) ? {angleId:draft.angleId} : {}) };
   } catch { /* An unavailable or outdated local draft must not block a new idea. */ }
   return null;
 }
 
+
+// Scope cleanup to old participation drafts. Never clear auth tokens, account
+// settings, themes, or drafts written for the new weekly programme.
+export function clearLegacyDrafts(storage: Pick<Storage, 'length' | 'key' | 'getItem' | 'removeItem'>): void {
+  const legacy = ['ftc-draft-queue', 'ftc-draft-reverse', 'ftc-draft-alone'];
+  try {
+    const remove: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key || !key.startsWith('ftc-draft-')) continue;
+      if (legacy.includes(key)) { remove.push(key); continue; }
+      try {
+        if (legacy.includes(JSON.parse(storage.getItem(key) ?? 'null')?.legacyKey)) remove.push(key);
+      } catch { /* Unrelated or malformed drafts are not reset. */ }
+    }
+    for (const key of remove) storage.removeItem(key);
+  } catch { /* Storage restrictions must not prevent account access. */ }
+}
