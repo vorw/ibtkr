@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ابتكر | لجنة الابتكار — FTC",
-  description: "مساحة لجنة الابتكار في نادي تقنية المستقبل. تحديات، أفكار، وبدايات جديدة.",
+  description: "تحدّي أسبوعي في نادي تقنية المستقبل. مشكلة واحدة، ثلاث زوايا، ومبتكر الأسبوع باختيار المجتمع.",
   icons: {
     icon: "/favicon.svg?v=bulb1",
     shortcut: "/favicon.svg?v=bulb1",
@@ -26,3 +26,4 @@ export default function RootLayout({
     </html>
   );
 }
+
