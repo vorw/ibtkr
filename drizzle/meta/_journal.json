@@ -15,6 +15,13 @@
       "when": 1790082000000,
       "tag": "0001_unique_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791232073847,
+      "tag": "0002_weekly_challenges",
+      "breakpoints": true
     }
   ]
 }

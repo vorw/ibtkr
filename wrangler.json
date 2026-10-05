@@ -1,18 +1,27 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ibtkr",
-  "main": "vinext/server/fetch-handler",
+  "main": "./worker.ts",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": ["nodejs_compat"],
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "ibtkr-community",
-    "database_id": "135b0885-3f80-4e78-8399-020c2521169a",
-    "migrations_dir": "drizzle"
-  }],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ibtkr-community",
+      "database_id": "135b0885-3f80-4e78-8399-020c2521169a",
+      "migrations_dir": "drizzle"
+    }
+  ],
   "vars": {
     "SUPABASE_URL": "https://zsdfbigxaqaehqmxhaqe.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_Knws9CPdj4pb6Q-keZaltw_W1VhIhl0",
     "TURNSTILE_SITE_KEY": "0x4AAAAAAE_Q2fd64aTYykc5"
+  },
+  "triggers": {
+    "crons": [
+      "0 21 * * TUE"
+    ]
   }
 }

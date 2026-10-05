@@ -65,6 +65,6 @@ test('public configuration refuses a server secret', () => {
 });
 test('login only returns to approved internal views and preserves the draft context', () => {
   for (const value of [null, 'https://evil.test', '//evil.test', '/\\evil.test', '/login', '/?view=ideas\\evil']) assert.equal(loginReturn(value), '/');
-  assert.equal(loginReturn('/?view=ideas&compose=queue&untrusted=value'), '/?view=ideas&compose=queue');
+  assert.equal(loginReturn('/?view=ideas&compose=week-2026-09-30&untrusted=value'), '/?view=ideas&compose=week-2026-09-30');
   assert.equal(loginReturn('/?view=unknown&compose=unknown'), '/?view=home');
 });

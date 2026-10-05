@@ -1,6 +1,9 @@
 import { getParticipant } from '@/lib/auth-server';
 import { database } from '@/lib/database';
-import { challenges, type AppData, type Comment, type Idea } from '@/lib/challenges';
+import { type Comment, type Idea } from '@/lib/challenges';
+import { readCommunity } from '@/lib/community-read';
+import { ensureWeeklySchema } from '@/lib/weekly-schema';
+import { findWeek, currentChallenge } from '@/lib/weekly';
 import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
 
@@ -53,55 +56,13 @@ async function getProfile(db: D1Database, userId: string): Promise<ProfileRow | 
   return db.prepare('SELECT display_name,name_key FROM profiles WHERE user_id=?').bind(userId).first<ProfileRow>();
 }
 
-async function readCommunity(userId: string): Promise<AppData> {
-  const db = database();
-  const [ideas, comments, own, reviews, profile] = await Promise.all([
-    db.prepare(`SELECT i.id,i.user_id,i.challenge_id,COALESCE(p.display_name,i.name) name,i.title,i.body,i.created_at,
-      (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.liked=1) likes,
-      (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.user_id=? AND r.liked=1) liked
-      FROM ideas i LEFT JOIN profiles p ON p.user_id=i.user_id
-      WHERE i.id IN (SELECT id FROM ideas ORDER BY created_at DESC, id DESC LIMIT 100) OR i.user_id=?
-      ORDER BY i.created_at DESC, i.id DESC`).bind(userId, userId).all<IdeaRow>(),
-    db.prepare(`SELECT c.id,c.idea_id,c.user_id,COALESCE(p.display_name,c.name) name,c.body,c.created_at
-      FROM comments c LEFT JOIN profiles p ON p.user_id=c.user_id
-      WHERE c.idea_id IN (SELECT id FROM ideas ORDER BY created_at DESC, id DESC LIMIT 100)
-        OR c.idea_id IN (SELECT id FROM ideas WHERE user_id=?)
-      ORDER BY c.created_at ASC, c.id ASC`).bind(userId).all<CommentRow>(),
-    db.prepare('SELECT COUNT(*) total, COUNT(DISTINCT challenge_id) rewarded FROM ideas WHERE user_id=?').bind(userId).first<{ total: number; rewarded: number }>(),
-    db.prepare('SELECT COUNT(DISTINCT c.idea_id) total FROM comments c JOIN ideas i ON c.idea_id=i.id WHERE c.user_id=? AND i.user_id<>?').bind(userId, userId).first<{ total: number }>(),
-    getProfile(db, userId),
-  ]);
-
-  const discussions = new Map<string, Comment[]>();
-  for (const { user_id, idea_id, ...comment } of comments.results) {
-    const entries = discussions.get(idea_id) ?? [];
-    entries.push({ ...comment, isOwn: user_id === userId });
-    discussions.set(idea_id, entries);
-  }
-
-  return {
-    signedIn: true,
-    ideas: ideas.results.map(({ user_id, liked, ...idea }) => ({
-      ...idea,
-      isOwn: user_id === userId,
-      liked: Boolean(liked),
-      comments: discussions.get(idea.id) ?? [],
-    })),
-    progress: {
-      ideas: own?.total ?? 0,
-      reviews: reviews?.total ?? 0,
-      xp: (own?.rewarded ?? 0) * 20 + (reviews?.total ?? 0) * 5,
-    },
-    profile: profile ? { displayName: profile.display_name } : null,
-  };
-}
-
 export async function GET(request: Request) {
   try {
     const user = await getParticipant(request);
-    if (!user) return reply({ signedIn: false, ideas: [], progress: { xp: 0, ideas: 0, reviews: 0 }, profile: null });
-    await ensureProfilesSchema(database());
-    return reply(await readCommunity(user.userId));
+    const db=database();
+    await ensureProfilesSchema(db);
+    await ensureWeeklySchema(db);
+    return reply(await readCommunity(db,user?.userId??null,new URL(request.url).searchParams));
   } catch (error) {
     console.error('Community load', error);
     return reply({ error: 'ما قدرنا نحمّل المشاركات. جرّب مرة ثانية.' }, 503);
@@ -111,8 +72,8 @@ export async function GET(request: Request) {
 const common = { id: z.string().uuid() };
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('profile'), displayName: z.string().max(80) }),
-  z.object({ action: z.literal('idea'), ...common, challengeId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
-  z.object({ action: z.literal('edit'), ...common, title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
+  z.object({ action: z.literal('idea'), ...common, challengeId: z.string(), angleId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
+  z.object({ action: z.literal('edit'), ...common, angleId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
   z.object({ action: z.literal('comment'), ...common, ideaId: z.string().uuid(), body: z.string().trim().min(5).max(1000) }),
   z.object({ action: z.literal('react'), ideaId: z.string().uuid(), liked: z.boolean() }),
 ]);
@@ -138,6 +99,7 @@ export async function POST(request: Request) {
     const value = parsed.data;
     const db = database();
     await ensureProfilesSchema(db);
+    await ensureWeeklySchema(db);
     const now = new Date().toISOString();
 
     if (value.action === 'profile') {
@@ -178,7 +140,7 @@ export async function POST(request: Request) {
         throw error;
       }
 
-      return reply({ ok: true, community: await readCommunity(user.userId) });
+      return reply({ ok: true, community: await readCommunity(db,user.userId,new URL(request.url).searchParams) });
     }
 
     const profile = await getProfile(db, user.userId);
@@ -188,24 +150,39 @@ export async function POST(request: Request) {
 
     if (value.action === 'idea') {
       ideaId = value.id;
-      if (!challenges.some(challenge => challenge.id === value.challengeId)) return reply({ error: 'المهمة غير موجودة.' }, 404);
-      await db.prepare('INSERT INTO ideas (id,user_id,challenge_id,name,title,body,created_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING')
-        .bind(value.id, user.userId, value.challengeId, participantName, value.title, value.body, now).run();
+      const week=findWeek(value.challengeId);
+      if (!week) return reply({error:'التحدّي غير موجود.'},404);
+      const previous=await db.prepare('SELECT user_id,challenge_id,angle_id,title,body FROM ideas WHERE id=?').bind(value.id).first<IdeaRow>();
+      if(previous){
+        if(previous.user_id!==user.userId || previous.challenge_id!==value.challengeId || previous.angle_id!==value.angleId || previous.title!==value.title || previous.body!==value.body) return reply({error:'سبق حفظ نسخة مختلفة من هذه المسودة.'},409);
+        return reply({ok:true,ideaId,community:await readCommunity(db,user.userId,new URL(request.url).searchParams,ideaId)});
+      }
+      if(currentChallenge()?.id!==week.id) return reply({error:'انتهت المشاركة لهذا الأسبوع. جرّب التحدّي الحالي؛ مسودتك باقية.'},409);
+      if(!week.angles.some(angle=>angle.id===value.angleId)) return reply({error:'اختر زاوية من زوايا التحدّي.'},400);
+      const savedWrite=await db.prepare(`INSERT INTO ideas (id,user_id,challenge_id,angle_id,name,title,body,created_at)
+        SELECT ?,?,?,?,?,?,?,? WHERE ?<=strftime('%Y-%m-%dT%H:%M:%fZ','now') AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<?
+        ON CONFLICT(id) DO NOTHING`)
+        .bind(value.id,user.userId,week.id,value.angleId,participantName,value.title,value.body,now,week.startsAt,week.endsAt).run();
+      if(!savedWrite.meta.changes) return reply({error:'انتهى وقت المشاركة. مسودتك باقية.'},409);
 
-      const saved = await db.prepare('SELECT user_id,challenge_id,title,body FROM ideas WHERE id=?').bind(value.id).first<Pick<IdeaRow, 'user_id' | 'challenge_id' | 'title' | 'body'>>();
-      if (!saved || saved.user_id !== user.userId || saved.challenge_id !== value.challengeId || saved.title !== value.title || saved.body !== value.body) {
+      const saved = await db.prepare('SELECT user_id,challenge_id,angle_id,title,body FROM ideas WHERE id=?').bind(value.id).first<Pick<IdeaRow, 'user_id' | 'challenge_id' | 'angle_id' | 'title' | 'body'>>();
+      if (!saved || saved.user_id !== user.userId || saved.challenge_id !== value.challengeId || saved.angle_id !== value.angleId || saved.title !== value.title || saved.body !== value.body) {
         return reply({ error: 'سبق حفظ نسخة مختلفة من هذه المسودة. افتحها من أفكارك لتطويرها.' }, 409);
       }
     } else if (value.action === 'edit') {
       ideaId = value.id;
-      const row = await db.prepare('SELECT user_id FROM ideas WHERE id=?').bind(value.id).first<{ user_id: string }>();
+      const row = await db.prepare('SELECT user_id,challenge_id FROM ideas WHERE id=?').bind(value.id).first<{ user_id: string; challenge_id: string }>();
       if (!row) return reply({ error: 'الفكرة غير موجودة.' }, 404);
       if (row.user_id !== user.userId) return reply({ error: 'تقدر تعدّل فكرتك أنت فقط.' }, 403);
-      await db.prepare('UPDATE ideas SET name=?,title=?,body=? WHERE id=? AND user_id=?')
-        .bind(participantName, value.title, value.body, value.id, user.userId).run();
+      const week=findWeek(row.challenge_id);
+      if(!week || currentChallenge()?.id!==week.id) return reply({error:'أُغلقت هذه المشاركة للحفاظ على نتيجة الأسبوع.'},409);
+      if(!week.angles.some(angle=>angle.id===value.angleId)) return reply({error:'اختر زاوية من زوايا التحدّي.'},400);
+      const changed=await db.prepare(`UPDATE ideas SET name=?,title=?,body=?,angle_id=? WHERE id=? AND user_id=? AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<?`)
+        .bind(participantName,value.title,value.body,value.angleId,value.id,user.userId,week.endsAt).run();
+      if(!changed.meta.changes) return reply({error:'انتهى وقت تعديل المشاركة.'},409);
     } else {
       ideaId = value.ideaId;
-      const row = await db.prepare('SELECT user_id FROM ideas WHERE id=?').bind(value.ideaId).first<{ user_id: string }>();
+      const row = await db.prepare('SELECT user_id,challenge_id FROM ideas WHERE id=?').bind(value.ideaId).first<{ user_id: string; challenge_id: string }>();
       if (!row) return reply({ error: 'الفكرة غير موجودة.' }, 404);
 
       if (value.action === 'comment') {
@@ -218,12 +195,17 @@ export async function POST(request: Request) {
         }
       } else {
         if (row.user_id === user.userId) return reply({ error: 'خلّ التشجيع للأفكار الثانية.' }, 400);
-        await db.prepare('INSERT INTO reactions (idea_id,user_id,liked) VALUES (?,?,?) ON CONFLICT(idea_id,user_id) DO UPDATE SET liked=excluded.liked')
-          .bind(value.ideaId, user.userId, value.liked ? 1 : 0).run();
+        const week=findWeek(row.challenge_id);
+        if(!week || currentChallenge()?.id!==week.id) return reply({error:'أُغلق التصويت لهذا الأسبوع.'},409);
+        const changed=await db.prepare(`INSERT INTO reactions (idea_id,user_id,liked)
+          SELECT ?,?,? WHERE strftime('%Y-%m-%dT%H:%M:%fZ','now')<?
+          ON CONFLICT(idea_id,user_id) DO UPDATE SET liked=excluded.liked`)
+          .bind(value.ideaId,user.userId,value.liked?1:0,week.endsAt).run();
+        if(!changed.meta.changes) return reply({error:'انتهى وقت التصويت.'},409);
       }
     }
 
-    return reply({ ok: true, ideaId, community: await readCommunity(user.userId) });
+    return reply({ ok: true, ideaId, community: await readCommunity(db,user.userId,new URL(request.url).searchParams,ideaId) });
   } catch (error) {
     console.error('Community save', error);
     return reply({ error: 'ما تأكدنا من الحفظ. كلامك موجود؛ جرّب مرة ثانية ولن تتكرر المشاركة.' }, 503);

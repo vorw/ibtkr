@@ -1,36 +1,26 @@
-# Community interaction check — 21 September 2026
+# Weekly community verification — 5 October 2026
 
-## Fixed behavior
+The weekly flow and release boundary are documented in [weekly-program.md](weekly-program.md).
 
-- The community's Share idea button opens the composer directly. Its mission selector switches between the three challenges and preserves a separate draft for each.
-- Creating or editing an idea opens the confirmed result in the current view. It does not navigate to another tab to imply success.
-- Comments and reactions use the state returned by the successful write, without a second fetch being necessary to display it.
-- Sign-in links retain the current view and idea/composer context. Idea, edit, and comment drafts are saved on the device. No participation is automatically submitted after sign-in.
-- Expired sessions preserve input and show the appropriate sign-in link. Failed saves preserve input for retry. Duplicate request IDs cannot silently claim different content was saved.
-- Guests see an explicit sign-in state instead of a misleading empty community or personal progress. Tab navigation supports Back and Forward.
+## Automated checks
 
-## Automated verification
+Run these with Node 24 after installing the locked dependencies:
 
-Run `npm run test:community` with Node 24. The 13 checks call the real route handlers with isolated test identities and an in-memory SQLite database created from the actual migration. They cover:
+```sh
+pnpm test:community
+pnpm test:auth
+pnpm exec tsc --noEmit
+pnpm build
+```
 
-- Guest access, payload validation, malformed JSON, oversized bodies, and cross-origin rejection.
-- Creating, reading, author-only editing, idempotent retries, and conflict detection.
-- Two-participant encouragement/undo and comments, without leaking account identifiers.
-- XP for distinct challenges and distinct other-person ideas; no extra points for edits or repeated comments.
-- Recovery when the write succeeds but the response read fails.
-- Older owned ideas and their comments beyond the latest 100 community ideas.
-- Safe sign-in destinations and corrupted-draft recovery.
+The combined authentication and community suite has 37 checks, using isolated identities and in-memory SQLite created from all real migrations. Coverage includes server-verified identity, safe login return context, profile validation, multi-angle entries, author-only editing, exact retry recovery, self-vote rejection, duplicate voting, weekly totals, tied ranks, cutoff guards including in-flight writes, archive access, escaped search, large feeds, 140-participant ranking pages, long discussion pages, frozen results, Wednesday rollover in Riyadh, automatic legacy-schema upgrades, concurrent first requests, and full rollback/retry after an upgrade failure.
 
-## Browser verification
+## Browser checks still required
 
-The managed preview checked the real guest interface and a temporary, isolated UI fixture for signed-in responses. The fixture never changed production data or authentication and was removed before the build.
+Check the actual application at phone and desktop sizes in both themes. Verify main-tab naming, removal of the tasks tab, angle transitions and hints, multiple submissions and editing, sign-in/draft recovery, week/angle/search filters, community and ranking pagination, comments, end-of-week locks, shared winners and empty/waiting states. Confirm the brand reads **FTC / IBTKR**.
 
-Confirmed direct composer opening, mission selection, restored drafts, in-place publication and editing, encouragement/undo, comments, personal filtering, confirmed-save XP display, failed-save retry, and expired-session recovery. The composer fits a 320-pixel phone viewport without horizontal overflow. Browser checks were paired with the real route/SQLite tests rather than treating fixture responses as backend verification.
+Browser layout verification was not completed in this environment. Automated route checks and a successful build do not substitute for this check.
 
-## Launch boundary
+## Production boundary
 
-The current Site is owner-only. Community access must be configured for a user-selected audience before other students can use it. Real hosted ChatGPT sign-in was not exercised by the managed preview; the dispatch-owned sign-in path and application return behavior were checked separately. A real invited participant should complete the first hosted sign-in and participation check after the audience is selected.
-
-The community shows the latest 100 ideas plus all of the current participant's own ideas. No schema or gamification rules changed in this update.
-
-![Updated composer](share-flow.jpg)
+Preserve the existing Cloudflare database and Supabase authentication. GitHub `main` triggers the connected release; the Worker automatically applies and records additive migration 0002 before weekly queries. CLI deployments still apply migrations before publishing. confirm the Tuesday 21:00 UTC scheduled handler. Older entries remain archived and accessible, without contributing to weekly results.
