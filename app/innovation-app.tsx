@@ -127,7 +127,6 @@ export default function InnovationApp() {
   const [data, setData] = useState<AppData>(initial);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [detail, setDetail] = useState<Challenge | null>(null);
 
   const [compose, setCompose] = useState<Challenge | null>(null);
   const [editing, setEditing] = useState(false);
@@ -210,7 +209,7 @@ export default function InnovationApp() {
     const onFocus = () => { if (document.visibilityState === 'visible') void refresh(); };
     const onBack = () => {
       const destination = readResume(window.location.search);
-      setTab(destination.view); setCompose(null); setDetail(null); setSelected(null);
+      setTab(destination.view); setCompose(null); setSelected(null);
     };
     window.addEventListener('focus', onFocus);
     window.addEventListener('popstate', onBack);
@@ -284,14 +283,13 @@ export default function InnovationApp() {
   function start(challenge: Challenge, idea?: Idea, angleId=angle?.id??challenge.angles[0].id) {
     if(currentChallenge()?.id!==challenge.id){toast.error('أُغلق هذا التحدّي. انتظر تحدّي الأسبوع القادم.');return;}
     if(idea)angleId=idea.angle_id??angleId;
-    rememberOrigin(); setDetail(null); setSelected(null); setEditing(Boolean(idea)); setFormError('');
+    rememberOrigin(); setSelected(null); setEditing(Boolean(idea)); setFormError('');
     const saved = readIdeaDraft(storage.get(idea ? 'ftc-edit-' + idea.id : 'ftc-draft-' + challenge.id + '-' + angleId));
     const value: Draft = saved && (!idea || saved.id === idea.id) ? saved : idea
       ? { id: idea.id, title: idea.title, body: idea.body,angleId:idea.angle_id??angleId }
       : { id: newId(), title: '', body: '',angleId };
     setDraft({...value,angleId:value.angleId??angleId}); setCompose(challenge);
   }
-  function openChallenge(challenge: Challenge) { rememberOrigin(); setDetail(challenge); }
   function openIdea(idea: Idea, focusComment = false) {
     rememberOrigin(); setOpenedIdea(idea); setSelected(idea.id);setCommentPage(1); setComment(''); commentId.current = ''; setFormError('');
     try {
@@ -374,7 +372,7 @@ export default function InnovationApp() {
     try {
       await signOut();
       ++refreshVersion.current;
-      setData(initial); setSelected(null); setCompose(null); setDetail(null); setError('');
+      setData(initial); setSelected(null); setCompose(null); setError('');
       toast.success('تم تسجيل الخروج.');
     } catch (caught) { toast.error(caught instanceof Error ? caught.message : 'تعذّر تسجيل الخروج.'); }
     finally { mutationLock.current = false; setBusy(false); }
@@ -413,11 +411,11 @@ export default function InnovationApp() {
           <div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>
           {mission ? <section className="mission-layout weekly-layout" aria-label="تحدّي الأسبوع">
             <article className="mission-hero tone-violet" onPointerMove={moveSpotlight}>
-              <div className="hero-grid" aria-hidden="true"/><span className="hero-number" aria-hidden="true">{mission.number}</span>
-              <div className="mission-topline"><span><span className="label-square"/>الأسبوع {mission.number}</span><span className="week-status"><Clock3 size={15}/> ينتهي الثلاثاء، ١١:٥٩ م</span></div>
+              <div className="hero-grid" aria-hidden="true"/>
+              <div className="mission-topline"><span className="week-marker"><span>الأسبوع</span><b className="week-number" dir="ltr">{mission.number}</b></span><span className="week-status"><Clock3 size={15}/> ينتهي الثلاثاء، ١١:٥٩ م</span></div>
               <div className="mission-copy"><span className="mission-type">{mission.category}</span><h1>{headline ? <><span>{headline[1]}</span><span>{headline[2]}</span></> : mission.title}</h1><p>{mission.description}</p></div>
               <div className="selected-angle" key={angle?.id}><span className={`angle-tag tone-${palette[missionIndex]}`}>{angle?.label}</span><p>{angle?.prompt}</p></div>
-              <div className="mission-controls"><Button className="launch-button" onClick={()=>start(mission)}>شارك حلّك</Button><button className="brief-button" onClick={()=>openChallenge(mission)}>تفاصيل التحدّي</button></div>
+              <div className="mission-controls"><Button className="launch-button" onClick={()=>start(mission)}>شارك حلّك</Button></div>
               <div className="mission-footer"><span>تقدر تشارك بأكثر من حل، وفي أكثر من زاوية.</span><span className="weekly-countdown" aria-label="الوقت المتبقي">{timeLeft}</span></div>
             </article>
             <aside className="command-stack">
@@ -459,7 +457,6 @@ export default function InnovationApp() {
       </DialogContent>
     </Dialog>
 
-    <Dialog open={Boolean(detail)} onOpenChange={open=>{if(!open)setDetail(null)}}><DialogContent className="ftc-dialog tone-violet" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose className="dialog-close" aria-label="إغلاق"><X size={20}/></DialogClose>{detail&&<><div className="dialog-sequence"><span>الأسبوع {detail.number}</span><span>{detail.category}</span></div><DialogTitle className="dialog-title">{detail.title}</DialogTitle><DialogDescription className="dialog-description">{detail.description}</DialogDescription><div className="brief-angles">{detail.angles.map((item,index)=><section key={item.id} className={`brief-angle tone-${palette[index]}`}><span className="angle-tag">0{index+1} · {item.label}</span><p>{item.prompt}</p><small>{item.hint}</small><Button className="outline-button" onClick={()=>start(detail,undefined,item.id)}>شارك من هالزاوية</Button></section>)}</div><div className="dialog-bottom"><span>المشاركة والتصويت حتى الثلاثاء، ١١:٥٩ م بتوقيت الرياض. تقدر تنشر أكثر من حل.</span></div></>}</DialogContent></Dialog>
 
     <Dialog open={Boolean(compose)} onOpenChange={(open) => { if (!open && !busy) setCompose(null); }}><DialogContent className="ftc-dialog composer" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose><div className="dialog-sequence"><span>{editing ? 'تطوير الفكرة' : 'بدايتك الجديدة'}</span><span>الأسبوع {compose?.number}</span></div><DialogTitle className="dialog-title">{editing ? 'خطوة أخرى لفكرتك.' : 'اكتبها كما هي الآن.'}</DialogTitle><DialogDescription className="dialog-description">{compose?.short}</DialogDescription><form className="idea-form" onSubmit={saveIdea}><div className="form-field"><label htmlFor="compose-angle">زاوية الحل</label><NativeSelect id="compose-angle" disabled={busy} value={draft.angleId??compose?.angles[0].id} onChange={event=>{if(editing)setDraft({...draft,angleId:event.target.value});else if(compose)start(compose,undefined,event.target.value)}}>{compose?.angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect><p className="compose-prompt">{compose?.angles.find(item=>item.id===draft.angleId)?.prompt}</p></div><div className="form-field"><label htmlFor="idea-title">عنوان الفكرة</label><Input id="idea-title" disabled={busy} required minLength={2} maxLength={100} value={draft.title} placeholder="اسم قصير وواضح" onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div><div className="form-field"><label htmlFor="idea-body">فكرتك <small>لا تحتاج إلى حل مكتمل</small></label><Textarea id="idea-body" disabled={busy} required minLength={10} maxLength={2000} rows={4} value={draft.body} placeholder="ما الذي ستغيّره؟ وكيف تعمل فكرتك؟" aria-describedby="draft-helper" onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></div><div className="form-helper" id="draft-helper"><span>{editing ? 'تقدر تعدّل حتى إغلاق التحدّي.' : 'مسودتك تُحفظ على هذا الجهاز.'}</span><span dir="ltr">{draft.body.length} / 2000</span></div>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="form-footer"><span><Lightbulb size={17} /> البداية أهم من الكمال</span>{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : editing ? 'احفظ التطوير' : 'شارك الفكرة'} <ArrowUpLeft size={20} /></Button> : <a className="launch-button signin-button" href={signInHref({ view: tab, ...(editing ? { edit: draft.id } : { compose: compose?.id, angle:draft.angleId }) })} target="_top">دخول للمشاركة <ArrowUpLeft size={20} /></a>}</div></form></DialogContent></Dialog>
 
