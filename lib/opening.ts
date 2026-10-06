@@ -2,7 +2,7 @@ import migration from '../drizzle/0006_opening_ceremony.sql?raw';
 
 // A new event ID starts a new ceremony without destroying the previous test.
 // Set enabled=false to remove the gate after review; weekly operations are separate.
-export const openingConfig = { id: 'ribbon-celebration-test-2026-10-07', target: 2, enabled: true };
+export const openingConfig = { id: 'ribbon-natural-test-2026-10-07', target: 2, enabled: true };
 export type OpeningState = {
   eventId: string; target: number; count: number; isOpen: boolean;
   signedIn: boolean; hasCut: boolean; openedAt: string | null;

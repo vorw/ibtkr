@@ -13,7 +13,7 @@ class AudioFixture {
   createBiquadFilter(){return {frequency:{value:0,setValueAtTime(){},exponentialRampToValueAtTime(){}},Q:{value:0},connect(){},disconnect(){}};}
   source(){const node={frequency:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){},start(t){this.startTime=t;},stop(t){this.stopTime=t;}};this.sources.push(node);return node;}
   createBufferSource(){return this.source();}
-  createOscillator(){return this.source();}
+  createOscillator(){throw Error('Pitched tones are forbidden in this activity');}
 }
 beforeEach(()=>{contexts=[];globalThis.window={AudioContext:AudioFixture};});
 afterEach(()=>{delete globalThis.window;});
@@ -38,4 +38,10 @@ test('re-enabling after mute creates a fresh usable context',async()=>{
   const audio=createOpeningAudio();await audio.unlock();audio.dispose();await audio.unlock();audio.cut();
   assert.equal(contexts.length,2);assert.equal(contexts[0].closed,true);assert.equal(contexts[1].state,'running');
   assert.ok(contexts[1].sources.length>0);audio.dispose();
+});
+
+test('every effect uses noise buffers, with no pitched oscillator or music playback',async()=>{
+  const audio=createOpeningAudio();await audio.unlock();audio.charge();audio.cut();audio.reveal();
+  assert.ok(contexts[0].sources.length>0);
+  assert.ok(contexts[0].sources.every(source=>source.buffer));audio.dispose();
 });

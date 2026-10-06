@@ -1,4 +1,5 @@
-// Layered ceremony effects, synthesized locally without background music.
+// Unpitched physical effects only: air, scissors, cloth and applause.
+// No oscillators, notes, chimes, instruments or background music.
 export function createOpeningAudio() {
   let context: AudioContext | null = null;
   function ready() { return context?.state === 'running' ? context : null; }
@@ -18,19 +19,10 @@ export function createOpeningAudio() {
     const filter = ctx.createBiquadFilter();
     const gain = envelope(ctx, start, duration, level, attack);
     filter.type = type; filter.frequency.setValueAtTime(frequency, start);
-    filter.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);filter.Q.value = 0.7;
+    filter.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);filter.Q.value = 0.35;
     source.buffer = buffer; source.connect(filter); filter.connect(gain);
     source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
     source.start(start); source.stop(start + duration);
-  }
-  function tone(ctx: AudioContext, start: number, frequency: number, duration: number, level: number, endFrequency = frequency, type: OscillatorType = 'sine') {
-    const oscillator = ctx.createOscillator();
-    const gain = envelope(ctx, start, duration, level);
-    oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, start);
-    oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
-    oscillator.connect(gain);
-    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-    oscillator.start(start); oscillator.stop(start + duration);
   }
   return {
     async unlock() {
@@ -45,33 +37,27 @@ export function createOpeningAudio() {
     charge() {
       const ctx = ready(); if (!ctx) return;
       const start = ctx.currentTime + 0.01;
-      // A rising breath as the scissors are picked up; no continuing loop.
-      noise(ctx, start, 0.52, 0.09, 450, 4800, 0.25, 'lowpass');
-      tone(ctx, start, 85, 0.48, 0.045, 160, 'triangle');
+      // A short dry metal scrape, like picking up a pair of scissors.
+      noise(ctx, start, 0.23, 0.09, 2600, 1700, 0.025, 'highpass');
     },
     cut() {
       const ctx = ready(); if (!ctx) return;
       const start = ctx.currentTime + 0.01;
-      // Metallic snip, tactile pop and a short bright confirmation.
-      noise(ctx, start, 0.075, 0.28, 3600);noise(ctx, start + 0.075, 0.055, 0.20, 2400);
-      tone(ctx, start + 0.025, 180, 0.16, 0.11, 55);
-      noise(ctx, start + 0.035, 0.32, 0.07, 2400, 900, 0.025, 'highpass');
-      tone(ctx, start + 0.12, 1820, 0.62, 0.055);
-      tone(ctx, start + 0.12, 2873, 0.45, 0.023);
+      // Two blade contacts and a soft fabric tear, all broadband noise.
+      noise(ctx, start, 0.065, 0.27, 3200, 3200, 0.004, 'highpass');
+      noise(ctx, start + 0.065, 0.055, 0.19, 2400, 2400, 0.004, 'highpass');
+      noise(ctx, start + 0.025, 0.24, 0.09, 1800, 950, 0.015, 'highpass');
     },
     reveal() {
       const ctx = ready(); if (!ctx) return;
-      const start = ctx.currentTime + 0.16;
-      // Confetti cannon, warm impact, sweeping air and scattered glass sparkles.
-      noise(ctx, start, 0.18, 0.30, 1700, 420, 0.008, 'lowpass');
-      tone(ctx, start, 130, 0.70, 0.16, 38);
-      tone(ctx, start + 0.02, 68, 0.95, 0.075, 31);
-      noise(ctx, start + 0.05, 1.25, 0.10, 900, 6500, 0.28, 'bandpass');
-      const sparkles=[2280,3467,2711,4183,3109,4871];
-      sparkles.forEach((frequency,i)=>{
-        const delay=[0.12,0.26,0.43,0.67,0.91,1.22][i];
-        tone(ctx, start + delay, frequency, 1.15 - i * 0.065, 0.037 - i * 0.003);
-        tone(ctx, start + delay + 0.08, frequency * 1.414, 0.7, 0.012);
+      const start = ctx.currentTime + 0.13;
+      // Ribbon release / air, followed by a short irregular applause effect.
+      noise(ctx, start, 0.72, 0.12, 1800, 4200, 0.15, 'lowpass');
+      const claps=[0.11,0.24,0.40,0.55,0.73,0.88,1.07,1.22,1.42,1.58,1.78,1.98];
+      claps.forEach((delay,i)=>{
+        const level=(0.11 + (i%3)*0.018)*(1-delay/3.5);
+        noise(ctx, start + delay, 0.105, level, 1500 + (i%4)*270, 1500, 0.003, 'highpass');
+        noise(ctx, start + delay + 0.012, 0.12, level*0.45, 1200, 750, 0.008, 'lowpass');
       });
     },
     dispose() { const old = context; context = null; if (old && old.state !== 'closed') void old.close().catch(() => {}); },
