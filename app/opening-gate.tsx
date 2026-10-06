@@ -2,25 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUpLeft, Check, RotateCcw, Scissors, Sparkles, Volume2, VolumeX } from 'lucide-react';
-import { sessionHeaders } from '@/lib/auth-client';
-import { signInHref } from '@/lib/participation';
 import type { OpeningState } from '@/lib/opening';
 import { createOpeningAudio } from '@/lib/opening-audio';
 import './opening-celebration.css';
 
 const arabic=(n:number)=>new Intl.NumberFormat('ar-SA').format(n);
 async function requestOpening(cut=false):Promise<OpeningState>{
-  const headers=await sessionHeaders();
-  const response=await fetch('/api/opening',{method:cut?'POST':'GET',cache:'no-store',
-    headers:{...headers,...(cut?{'Content-Type':'application/json'}:{})},
+  const response=await fetch('/api/opening',{method:cut?'POST':'GET',cache:'no-store',credentials:'same-origin',
+    headers:cut?{'Content-Type':'application/json'}:{},
     ...(cut?{body:JSON.stringify({action:'cut'})}:{}),signal:AbortSignal.timeout(15000)});
   const body=await response.json() as Partial<OpeningState>&{error?:string};
   if(!response.ok)throw new Error(body.error??'تعذّر الاتصال. جرّب مرة ثانية.');
-  if(typeof body.eventId!=='string'||typeof body.target!=='number'||typeof body.count!=='number'||typeof body.isOpen!=='boolean'||typeof body.signedIn!=='boolean'||typeof body.hasCut!=='boolean')throw new Error('تعذّر قراءة حالة الافتتاح. جرّب مرة ثانية.');
+  if(typeof body.eventId!=='string'||typeof body.target!=='number'||typeof body.count!=='number'||typeof body.isOpen!=='boolean'||typeof body.canCut!=='boolean'||typeof body.hasCut!=='boolean')throw new Error('تعذّر قراءة حالة الافتتاح. جرّب مرة ثانية.');
   return body as OpeningState;
 }
 
-const previewState:OpeningState={eventId:'visual-preview',target:2,count:0,isOpen:false,signedIn:true,hasCut:false,openedAt:null};
+const previewState:OpeningState={eventId:'visual-preview',target:2,count:0,isOpen:false,canCut:true,hasCut:false,position:null,openedAt:null};
 export default function OpeningGate({children,preview=false}:{children:ReactNode;preview?:boolean}){
   const [state,setState]=useState<OpeningState|null>(null);
   const [error,setError]=useState('');
@@ -35,6 +32,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   const started=useRef<{id:number;y:number}|null>(null);
   const wasWaiting=useRef(false);
   const mutation=useRef(false);
+  const refreshing=useRef(false);
   const alive=useRef(true);
   const sequence=useRef(0);
 
@@ -55,13 +53,15 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
 
   const refresh=useCallback(async()=>{
     if(preview){setState(current=>current??previewState);return;}
-    if(mutation.current)return;
+    if(mutation.current||refreshing.current)return;
+    refreshing.current=true;
     const version=++sequence.current;
     try{
       const next=await requestOpening();
       if(!alive.current||version!==sequence.current)return;
       setState(current=>current?.isOpen?current:next);setError('');
     }catch(e){if(alive.current&&version===sequence.current)setError(e instanceof Error?e.message:'تعذّر الاتصال.');}
+    finally{refreshing.current=false;}
   },[preview]);
   useEffect(()=>{
     if(entered)return;
@@ -83,16 +83,16 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   },[state?.isOpen]);
 
   async function cut(){
-    if(mutation.current||!state?.signedIn||state.hasCut||state.isOpen)return;
+    if(mutation.current||!state?.canCut||state.hasCut||state.isOpen)return;
     void unlockSound();
     mutation.current=true;++sequence.current;setBusy(true);setError('');
     try{
-      const next=preview?{...state,count:Math.min(state.count+1,state.target),hasCut:true,isOpen:state.count+1>=state.target,openedAt:state.count+1>=state.target?new Date().toISOString():null}:await requestOpening(true);
+      const next=preview?{...state,count:Math.min(state.count+1,state.target),hasCut:true,canCut:false,position:state.count+1,isOpen:state.count+1>=state.target,openedAt:state.count+1>=state.target?new Date().toISOString():null}:await requestOpening(true);
       if(alive.current){setState(next);setDrag(0);}
     }catch(e){if(alive.current){setError(e instanceof Error?e.message:'تعذّر حفظ القصّة.');setDrag(0);void refresh();}}
     finally{mutation.current=false;if(alive.current)setBusy(false);}
   }
-  const canCut=Boolean(state?.signedIn&&!state.hasCut&&!state.isOpen&&!busy);
+  const canCut=Boolean(state?.canCut&&!state.hasCut&&!state.isOpen&&!busy);
   function pointerDown(event:PointerEvent<HTMLButtonElement>){
     if(!canCut)return;
     const activation=unlockSound();
@@ -114,9 +114,9 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   function cancel(){started.current=null;setDrag(0);}
 
   if(entered)return <>{children}</>;
-  const count=state?.count??0,target=state?.target??2;
-  const cutX=((Math.min(count,target-1)+1)/(target+1))*100;
-  const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`,'--drag-energy':drag/180,'--burst-x':`${count/(target+1)*100}%`} as CSSProperties;
+  const count=state?.count??0,target=state?.target??(preview?2:15);
+  const cutX=10+((Math.min(count,target-1)+1)/(target+1))*80;
+  const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`,'--drag-energy':drag/180,'--burst-x':`${10+count/(target+1)*80}%`} as CSSProperties;
   return <div className={`opening-page${opening?' is-opening':''}${state?.hasCut?' has-cut':''}`} dir="rtl" style={style}>
     <div className="opening-atmosphere" aria-hidden="true"><div className="opening-aura aura-violet"/><div className="opening-aura aura-gold"/><div className="opening-aura aura-lilac"/><svg className="opening-flow-lines" viewBox="0 0 1440 900" preserveAspectRatio="none"><path d="M -120 760 C 150 380 510 860 820 450 S 1270 130 1560 180"/><path d="M -100 180 C 280 70 180 530 570 380 S 1110 510 1540 70"/><path d="M -80 870 C 280 530 660 930 1010 640 S 1250 420 1550 500"/></svg>{Array.from({length:18},(_,i)=><i className="opening-glint" key={i} style={{'--x':`${7+(i*37)%88}%`,'--y':`${13+(i*19)%73}%`,'--delay':`${-i*1.7}s`,'--duration':`${6+i%5*1.2}s`,'--rotation':`${i*31}deg`} as CSSProperties}/>)}</div>
     {opening&&<div className="opening-celebration" aria-hidden="true"><span className="opening-reveal-glow"/><span className="opening-reveal-ring"/><span className="opening-reveal-ring ring-delayed"/>{Array.from({length:32},(_,i)=><i key={i} className="opening-party-piece" style={{'--x':`${10+(i*23)%80}%`,'--drift':`${(i%7-3)*55}px`,'--spin':`${270+i*37}deg`,'--delay':`${i%8*0.035}s`} as CSSProperties}/>)}</div>}
@@ -133,7 +133,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
       <div className={`opening-stage${count>0?' ribbon-touched':''}`} aria-label="شريط افتتاح ابتكر">
         <div className="opening-ribbon" aria-hidden="true">
           <div className="ribbon-half ribbon-left"><span>IBTKR · ابتكر · IBTKR</span></div><div className="ribbon-half ribbon-right"><span>IBTKR · ابتكر · IBTKR</span></div>
-          {Array.from({length:count},(_,i)=><span key={i} className="ribbon-snip" style={{left:`${(i+1)/(target+1)*100}%`}}/>)}
+          {Array.from({length:count},(_,i)=><span key={i} className="ribbon-snip" style={{left:`${10+(i+1)/(target+1)*80}%`}}/>)}
           <span className="opening-ribbon-sheen"/>
         </div>
         {count>0&&!opening&&<div key={count} className="opening-cut-wave" aria-hidden="true"/>}
@@ -144,14 +144,15 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
             onClick={e=>{if(e.detail===0)void cut();}}><Scissors size={42} strokeWidth={1.6}/></button>
           <span className="opening-drag-hint"><ArrowDown size={15}/>{busy?'نحفظ قصّتك…':'اسحب المقص للأسفل'}</span>
         </>}
-        {state?.hasCut&&!opening&&<div className="opening-cut-thanks"><span><Check size={25}/></span><strong>قصّتك صارت جزءًا من البداية.</strong><small>باقي {arabic(Math.max(0,target-count))} ونفتحها معًا.</small>{preview&&<button className="opening-accessible-cut opening-preview-next" onClick={()=>setState(current=>current?{...current,hasCut:false}:current)}>جرّب القصّة الثانية كمشارك آخر <ArrowUpLeft size={14}/></button>}</div>}
+        {state?.hasCut&&!opening&&<div className="opening-cut-thanks"><span><Check size={25}/></span><strong>قصّتك صارت جزءًا من البداية.</strong><small>قصّتك رقم {arabic(state.position??count)} من {arabic(target)}. باقي {arabic(Math.max(0,target-count))} ونفتحها معًا.</small>{preview&&<button className="opening-accessible-cut opening-preview-next" onClick={()=>setState(current=>current?{...current,hasCut:false,canCut:true}:current)}>جرّب القصّة الثانية كمشارك آخر <ArrowUpLeft size={14}/></button>}</div>}
       </div>
       <section className="opening-participation" aria-label="تقدم الافتتاح" aria-live="polite">
-        <div className="opening-tally"><span key={count} className="opening-tally-number" dir="ltr">{arabic(count)}<span>/</span>{arabic(target)}</span><div><strong>{opening?'البداية اكتملت.':count?'أول قصّة وصلت.':'كن جزءًا من أول لحظة.'}</strong><p>{opening?'حياك في مساحة الأفكار.':'مشاركان يفتحان ابتكر للجميع.'}</p></div><div className="opening-dots" aria-hidden="true">{Array.from({length:target},(_,i)=><span key={i} className={i<count?'cut':''}>{i<count?<Check size={14}/>:arabic(i+1)}</span>)}</div></div>
+        <div className={`opening-tally${target>3?' opening-tally-many':''}`}><span key={count} className="opening-tally-number" dir="ltr">{arabic(count)}<span>/</span>{arabic(target)}</span><div><strong>{opening?'البداية اكتملت.':count?'أول قصّة وصلت.':'كن جزءًا من أول لحظة.'}</strong><p>{opening?'حياك في مساحة الأفكار.':`نحتاج ${arabic(target)} قصّة لنفتح ابتكر للجميع.`}</p></div><div className="opening-dots" aria-hidden="true">{Array.from({length:target},(_,i)=><span key={i} className={i<count?'cut':''}>{i<count?<Check size={14}/>:arabic(i+1)}</span>)}</div></div>
         {!state&&!error&&<p className="opening-connection" role="status">نجهّز لحظة البداية…</p>}
-        {state&&!state.signedIn&&!opening&&<a href={signInHref({view:'home'})} className="opening-signin" target="_top">سجّل دخولك وشارك في الافتتاح <ArrowUpLeft size={19}/></a>}
+
+        {canCut&&<p className="opening-guest-note">الافتتاح للجميع، بدون تسجيل دخول. قصّة واحدة لكل متصفح.</p>}
         {canCut&&<button className="opening-accessible-cut" onClick={()=>void cut()}>أو اضغط هنا لقصّ الشريط <Scissors size={14}/></button>}
-        {state?.hasCut&&!opening&&<p className="opening-wait"><span/> ننتظر القصّة الثانية. الصفحة تتحدّث تلقائيًا.</p>}
+        {state?.hasCut&&!opening&&<p className="opening-wait"><span/> ننتظر باقي المشاركين. الصفحة تتحدّث تلقائيًا.</p>}
         {error&&<div className="opening-error" role="alert"><p>{error}</p><button onClick={()=>void refresh()}><RotateCcw size={14}/> إعادة المحاولة</button></div>}
       </section>
     </main>

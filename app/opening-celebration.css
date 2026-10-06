@@ -57,3 +57,5 @@
 @keyframes ceremony-cloth-settle{0%{transform:translateY(0)}30%{transform:translateY(9px) rotate(.4deg)}65%{transform:translateY(-3px)}100%{transform:translateY(0)}}
 @keyframes ceremony-exit{from{opacity:1}to{opacity:0}}
 @media(prefers-reduced-motion:reduce){.opening-page,.opening-page.is-opening,.opening-page .ribbon-half,.opening-flow-lines path{animation:none!important;transition:none!important}.opening-page .opening-ribbon{transform:none}.opening-page.is-opening{opacity:1}.opening-flow-lines path{stroke-dasharray:none;opacity:.4}}
+
+.opening-tally-many{flex-wrap:wrap}.opening-tally-many .opening-dots{width:100%;display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:5px;margin-top:3px}.opening-tally-many .opening-dots>span{width:100%;height:23px;border-radius:4px;font-size:9px}.opening-guest-note{font-size:11px;color:var(--soft);margin:15px 0 0;line-height:1.7}.opening-page .opening-preview-next{margin-top:0;padding:5px 8px}@media(max-width:600px){.opening-tally-many .opening-dots{gap:3px}.opening-tally-many .opening-dots>span{height:20px;font-size:8px}.opening-tally-many .opening-dots svg{width:11px;height:11px}}
