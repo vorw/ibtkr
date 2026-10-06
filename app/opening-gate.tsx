@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
-import { ArrowDown, ArrowUpLeft, Check, RotateCcw, Scissors, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUpLeft, Check, RotateCcw, Scissors, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { sessionHeaders } from '@/lib/auth-client';
 import { signInHref } from '@/lib/participation';
 import type { OpeningState } from '@/lib/opening';
+import { createOpeningAudio } from '@/lib/opening-audio';
 
 const arabic=(n:number)=>new Intl.NumberFormat('ar-SA').format(n);
 async function requestOpening(cut=false):Promise<OpeningState>{
@@ -26,11 +27,30 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   const [drag,setDrag]=useState(0);
   const [opening,setOpening]=useState(false);
   const [entered,setEntered]=useState(false);
+  const [soundEnabled,setSoundEnabled]=useState(true);
+  const soundAllowed=useRef(true);
+  const sound=useRef<ReturnType<typeof createOpeningAudio>|null>(null);
+  const previousCount=useRef<number|null>(null);
   const started=useRef<{id:number;y:number}|null>(null);
   const wasWaiting=useRef(false);
   const mutation=useRef(false);
   const alive=useRef(true);
   const sequence=useRef(0);
+
+  function unlockSound(){
+    if(!soundAllowed.current)return;
+    sound.current??=createOpeningAudio();void sound.current.unlock();
+  }
+  function toggleSound(){
+    const enabled=!soundAllowed.current;soundAllowed.current=enabled;setSoundEnabled(enabled);
+    if(enabled)unlockSound();else{sound.current?.dispose();sound.current=null;}
+  }
+  useEffect(()=>()=>{sound.current?.dispose();sound.current=null;},[]);
+  useEffect(()=>{
+    if(!state)return;
+    if(previousCount.current!==null&&state.count>previousCount.current&&soundAllowed.current&&document.visibilityState==='visible')sound.current?.cut();
+    previousCount.current=state.count;
+  },[state?.count]);
 
   const refresh=useCallback(async()=>{
     if(preview){setState(current=>current??previewState);return;}
@@ -55,6 +75,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
     if(!state.isOpen){wasWaiting.current=true;return;}
     if(!wasWaiting.current){setEntered(true);return;}
     setOpening(true);setDrag(0);
+    if(soundAllowed.current&&document.visibilityState==='visible')sound.current?.reveal();
     const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const timer=setTimeout(()=>setEntered(true),reduced?450:2200);
     return()=>clearTimeout(timer);
@@ -62,6 +83,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
 
   async function cut(){
     if(mutation.current||!state?.signedIn||state.hasCut||state.isOpen)return;
+    unlockSound();
     mutation.current=true;++sequence.current;setBusy(true);setError('');
     try{
       const next=preview?{...state,count:Math.min(state.count+1,state.target),hasCut:true,isOpen:state.count+1>=state.target,openedAt:state.count+1>=state.target?new Date().toISOString():null}:await requestOpening(true);
@@ -72,6 +94,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   const canCut=Boolean(state?.signedIn&&!state.hasCut&&!state.isOpen&&!busy);
   function pointerDown(event:PointerEvent<HTMLButtonElement>){
     if(!canCut)return;
+    unlockSound();
     event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);
     started.current={id:event.pointerId,y:event.clientY};setDrag(0);
   }
@@ -96,7 +119,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
     {preview&&<div className="opening-preview-label">معاينة بصرية · لا تغيّر الافتتاح الحقيقي</div>}
     <header className="opening-header">
       <div className="opening-brand"><img src="/assets/ftc-logo.svg" alt="نادي تقنية المستقبل" width="90" height="48"/><span/><strong>ابتكر<span>▪</span><small>لجنة الابتكار</small></strong></div>
-      <span className="opening-edition"><span className="opening-live-dot"/> لحظة البداية</span>
+      <div className="opening-header-actions"><span className="opening-edition"><span className="opening-live-dot"/> لحظة البداية</span><button type="button" className="opening-sound" onClick={toggleSound} aria-pressed={soundEnabled} aria-label={soundEnabled?'إيقاف المؤثرات الصوتية':'تشغيل المؤثرات الصوتية'} title={soundEnabled?'إيقاف المؤثرات الصوتية':'تشغيل المؤثرات الصوتية'}>{soundEnabled?<Volume2 size={17}/>:<VolumeX size={17}/>}<span>{soundEnabled?'الصوت':'بدون صوت'}</span></button></div>
     </header>
     <main className="opening-main" id="main-content">
       <div className="opening-copy"><span className="opening-eyebrow">قصّة صغيرة. بداية كبيرة.</span>

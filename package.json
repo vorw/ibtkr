@@ -15,7 +15,7 @@
     "deploy": "node scripts/deploy-independent.mjs",
     "test:auth": "node --test tests/auth.test.mjs",
     "test:weekly-email": "node --test tests/weekly-email.test.mjs",
-    "test:opening": "node --test tests/opening.test.mjs"
+    "test:opening": "node --test tests/opening.test.mjs tests/opening-audio.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
