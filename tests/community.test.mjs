@@ -32,7 +32,7 @@ const { readResume, signInHref, readIdeaDraft, clearLegacyDrafts } = await impor
 const newIdea = (extra = {}) => ({
   action: 'idea',
   id: randomUUID(),
-  challengeId: 'week-2026-09-30',
+  challengeId: 'week-2026-10-07',
   angleId:'change',
   title: 'فكرة للطابور',
   body: 'نضيف نشاطًا بسيطًا خلال انتظار الطلب.',
@@ -58,7 +58,7 @@ async function setProfile(displayName) {
 
 describe('Community operations against the real route and SQLite schema', () => {
   beforeEach(async () => {
-    mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-05T12:00:00.000Z') });
+    mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-12T12:00:00.000Z') });
     resetDatabase();
     const result = await setProfile('أحمد');
     assert.equal(result.status, 200);
@@ -66,6 +66,54 @@ describe('Community operations against the real route and SQLite schema', () => 
 
   afterEach(() => mock.timers.reset());
   after(() => state.db?.close());
+
+  test('official launch archives test activity once, clears test XP, and preserves accounts and official activity',async()=>{
+    const {ensureWeeklySchema}=await import('../lib/weekly-schema.ts');const {database}=await import('./community-fixture.mjs');
+    state.db.prepare('DELETE FROM d1_migrations WHERE name=?').run('0005_launch_week_one.sql');
+    const profile=state.db.prepare('SELECT * FROM profiles WHERE user_id=?').get('alice');
+    const old=randomUUID(),official=randomUUID(),created='2026-10-05T12:00:00.000Z';
+    state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(old,'alice','week-2026-09-30','أحمد','فكرة اختبار','شرح مفصل من الجولة التجريبية.',created,'change');
+    state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(official,'bob','week-2026-10-07','محمد','فكرة الإطلاق','شرح مفصل من أسبوع الإطلاق.','2026-10-07T01:00:00.000Z','change');
+    for(const id of [old,official]){
+      state.db.prepare('INSERT INTO comments VALUES (?,?,?,?,?,?)').run(randomUUID(),id,'bob','محمد','مساهمة لتطوير هذه الفكرة.',created);
+      state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(id,'carol',1);
+    }
+    state.db.prepare('INSERT INTO weekly_results VALUES (?,?,?,?,?,?,?)').run('week-2026-09-30','alice','أحمد',1,1,1,created);
+    state.db.prepare('INSERT INTO finalized_weeks VALUES (?,?)').run('week-2026-09-30',created);
+    await Promise.all([ensureWeeklySchema(database()),ensureWeeklySchema(database()),ensureWeeklySchema(database())]);
+    for(const table of ['ideas','comments','reactions','weekly_results','finalized_weeks']){
+      assert.equal(state.db.prepare('SELECT COUNT(*) n FROM launch_test_archive_'+table).get().n,1);
+    }
+    assert.equal(state.db.prepare('SELECT id FROM ideas').get().id,official);
+    for(const table of ['comments','reactions'])assert.equal(state.db.prepare('SELECT idea_id FROM '+table).get().idea_id,official);
+    for(const table of ['weekly_results','finalized_weeks'])assert.equal(state.db.prepare('SELECT COUNT(*) n FROM '+table).get().n,0);
+    assert.deepEqual(state.db.prepare('SELECT * FROM profiles WHERE user_id=?').get('alice'),profile);
+    const data=await read('week=all');assert.deepEqual(data.progress,{ideas:0,reviews:0,xp:0});
+    assert.deepEqual(data.weekly.weeks.map(x=>[x.id,x.number]),[['week-2026-10-07','01']]);
+    assert.equal(data.ideas.length,1);assert.equal(data.ideas[0].id,official);
+    const retired=await read('week=week-2026-09-30');assert.equal(retired.weekly.selected,null);assert.equal(retired.ideas.length,0);
+    await ensureWeeklySchema(database());assert.equal(state.db.prepare('SELECT COUNT(*) n FROM launch_test_archive_ideas').get().n,1);
+  });
+
+  test('failed launch reset rolls back backups and activity together, then retries without loss',async()=>{
+    const {ensureWeeklySchema}=await import('../lib/weekly-schema.ts');const {database}=await import('./community-fixture.mjs');
+    state.db.prepare('DELETE FROM d1_migrations WHERE name=?').run('0005_launch_week_one.sql');
+    const id=randomUUID();state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(id,'alice','week-2026-09-30','أحمد','فكرة اختبار','شرح مفصل من الجولة التجريبية.','2026-10-05T12:00:00.000Z','change');
+    const original=database();let fail=true;
+    const db={...original,prepare(sql){
+      if(sql.startsWith('INSERT OR IGNORE INTO d1_migrations'))return {bind(name){
+        if(fail&&name==='0005_launch_week_one.sql')return {async run(){throw Error('Launch marker unavailable');}};
+        return original.prepare(sql).bind(name);
+      }};
+      return original.prepare(sql);
+    }};
+    await assert.rejects(ensureWeeklySchema(db),/Launch marker unavailable/);
+    assert.equal(state.db.prepare('SELECT id FROM ideas').get().id,id);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM launch_test_archive_ideas').get().n,0);
+    fail=false;await ensureWeeklySchema(db);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM ideas').get().n,0);
+    assert.equal(state.db.prepare('SELECT id FROM launch_test_archive_ideas').get().id,id);
+  });
 
   test('GitHub-only release clears old participation and XP without changing an existing profile',async()=>{
     resetDatabase({weekly:false});
@@ -81,10 +129,10 @@ describe('Community operations against the real route and SQLite schema', () => 
     assert.equal(data.signedIn,true);assert.deepEqual(data.profile,{displayName:'أحمد'});
     assert.deepEqual(state.db.prepare('SELECT * FROM profiles').get(),profile);
     assert.deepEqual(data.progress,{ideas:0,reviews:0,xp:0});
-    assert.equal(data.activityVersion,'weekly-clean-start-2026-10-06');
+    assert.equal(data.activityVersion,'official-launch-2026-10-07');
     assert.equal(data.ideas.length,0);assert.equal(data.weekly.ownEntries,0);assert.equal(data.weekly.ownLikes,0);
     for(const table of ['ideas','comments','reactions']) assert.equal(state.db.prepare('SELECT COUNT(*) n FROM '+table).get().n,0);
-    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations').get().n,2);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations').get().n,3);
     assert.equal((await post(newIdea())).status,200); // no registration or name setup again
     await read();assert.equal(state.db.prepare('SELECT COUNT(*) n FROM ideas').get().n,1);
   });
@@ -92,10 +140,10 @@ describe('Community operations against the real route and SQLite schema', () => 
   test('legacy cleanup preserves new weekly entries, likes, comments, results and profiles across concurrent instances',async()=>{
     resetDatabase();
     const {ensureWeeklySchema}=await import('../lib/weekly-schema.ts');const {database}=await import('./community-fixture.mjs');
-    const created='2026-10-05T12:00:00.000Z';
+    const created='2026-10-12T12:00:00.000Z';
     state.db.prepare('INSERT INTO profiles VALUES (?,?,?,?,?)').run('alice','أحمد','احمد',created,created);
     const old=randomUUID(),weekly=randomUUID();
-    for(const [id,challenge,angle] of [[old,'queue',null],[weekly,'week-2026-09-30','change']]) {
+    for(const [id,challenge,angle] of [[old,'queue',null],[weekly,'week-2026-10-07','change']]) {
       state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(id,'alice',challenge,'أحمد','عنوان فكرة','شرح مفصل للفكرة المقترحة.',created,angle);
       state.db.prepare('INSERT INTO comments VALUES (?,?,?,?,?,?)').run(randomUUID(),id,'bob','محمد','إضافة لتطوير هذه الفكرة.',created);
       state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(id,'bob',1);
@@ -105,7 +153,7 @@ describe('Community operations against the real route and SQLite schema', () => 
     await Promise.all([ensureWeeklySchema(database()),ensureWeeklySchema(database()),ensureWeeklySchema(database())]);
     assert.equal(state.db.prepare('SELECT id FROM ideas').get().id,weekly);
     for(const table of ['comments','reactions']) assert.equal(state.db.prepare('SELECT idea_id FROM '+table).get().idea_id,weekly);
-    for(const table of ['weekly_results','finalized_weeks']) assert.equal(state.db.prepare('SELECT challenge_id FROM '+table).get().challenge_id,'week-2026-09-30');
+    for(const table of ['weekly_results','finalized_weeks']) assert.equal(state.db.prepare('SELECT challenge_id FROM '+table).get().challenge_id,'week-2026-10-07');
     assert.equal(state.db.prepare('SELECT COUNT(*) n FROM profiles').get().n,1);
     assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations WHERE name=?').get('0003_clear_legacy_activity.sql').n,1);
     const data=await read('week=all');assert.deepEqual(data.progress,{ideas:1,reviews:0,xp:20});assert.equal(data.ideas[0].likes,1);
@@ -148,7 +196,7 @@ describe('Community operations against the real route and SQLite schema', () => 
     assert.equal(state.db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='weekly_results'").get().n,0);
     fail=false;await ensureWeeklySchema(db);
     assert.ok(state.db.prepare('PRAGMA table_info(ideas)').all().some(row=>row.name==='angle_id'));
-    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations').get().n,2);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM d1_migrations').get().n,3);
   });
 
   test('concurrent new Worker instances upgrade once without duplicate columns',async()=>{
@@ -259,7 +307,7 @@ describe('Community operations against the real route and SQLite schema', () => 
     const result = await post({ ...draft, action: 'edit', title: 'الفكرة بعد التطوير', challengeId: 'reverse' });
     assert.equal(result.status, 200);
     assert.equal(result.body.community.ideas[0].title, 'الفكرة بعد التطوير');
-    assert.equal(result.body.community.ideas[0].challenge_id, 'week-2026-09-30');
+    assert.equal(result.body.community.ideas[0].challenge_id, 'week-2026-10-07');
     assert.equal(result.body.community.progress.xp, 20);
     assert.equal((await post({ ...draft, action: 'edit', id: randomUUID() })).status, 404);
   });
@@ -376,7 +424,7 @@ describe('Community operations against the real route and SQLite schema', () => 
     const first=newIdea();await post(first);
     await post({action:'comment',id:randomUUID(),ideaId:first.id,body:'تعليق على الفكرة القديمة.'});
     const insert=state.db.prepare('INSERT INTO ideas (id,user_id,challenge_id,angle_id,name,title,body,created_at) VALUES (?,?,?,?,?,?,?,?)');
-    for(let i=0;i<125;i++)insert.run(randomUUID(),'bob','week-2026-09-30','reverse','محمد','فكرة أخرى','شرح كاف للفكرة الجديدة.','2099-01-01T00:00:00.000Z');
+    for(let i=0;i<125;i++)insert.run(randomUUID(),'bob','week-2026-10-07','reverse','محمد','فكرة أخرى','شرح كاف للفكرة الجديدة.','2099-01-01T00:00:00.000Z');
     const seen=new Set();for(let page=1;page<=11;page++){const data=await read('page='+page);assert.ok(data.ideas.length<=12);assert.equal(data.pagination.total,126);for(const idea of data.ideas)seen.add(idea.id);}
     assert.equal(seen.size,126);
     const data=await read('idea='+first.id);assert.equal(data.focusedIdea.comments.length,1);assert.equal(data.focusedIdea.commentCount,1);
@@ -403,18 +451,18 @@ describe('Community operations against the real route and SQLite schema', () => 
     for(const query of ['week=legacy','week=all']){
       const data=await read(query);assert.equal(data.weekly.ownEntries,1);assert.equal(data.weekly.ownLikes,1);
     }
-    mock.timers.setTime(new Date('2026-10-07T12:00:00.000Z').getTime());
-    state.databaseNow='2026-10-07T12:00:00.000Z';
-    await post(newIdea({challengeId:'week-2026-10-07'}));
-    const previous=await read('week=week-2026-09-30');
-    assert.equal(previous.weekly.selected.id,'week-2026-09-30');
+    mock.timers.setTime(new Date('2026-10-14T12:00:00.000Z').getTime());
+    state.databaseNow='2026-10-14T12:00:00.000Z';
+    await post(newIdea({challengeId:'week-2026-10-14'}));
+    const previous=await read('week=week-2026-10-07');
+    assert.equal(previous.weekly.selected.id,'week-2026-10-07');
     assert.equal(previous.weekly.leaders[0].likes,1);
     assert.equal(previous.weekly.ownEntries,1);assert.equal(previous.weekly.ownLikes,0);
   });
 
   test('database cutoff also blocks writes that started before the deadline',async()=>{
     const draft=newIdea();await post(draft);
-    state.databaseNow='2026-10-06T21:00:00.000Z';
+    state.databaseNow='2026-10-13T21:00:00.000Z';
     assert.equal((await post(newIdea())).status,409);
     assert.equal((await post({...draft,action:'edit'})).status,409);
     state.user='bob';await setProfile('محمد');
@@ -454,50 +502,50 @@ describe('Community operations against the real route and SQLite schema', () => 
 
   test('date boundaries are Wednesday 00:00 Riyadh and next published week replaces the old one',async()=>{
     const {currentChallenge,weeklyChallenges,challengeStatus}=await import('../lib/weekly.ts');const first=weeklyChallenges[0];
-    assert.equal(currentChallenge(new Date('2026-10-06T20:59:59.999Z')).id,first.id);
-    assert.equal(currentChallenge(new Date('2026-10-06T21:00:00.000Z')).id,'week-2026-10-07');
+    assert.equal(currentChallenge(new Date('2026-10-13T20:59:59.999Z')).id,first.id);
+    assert.equal(currentChallenge(new Date('2026-10-13T21:00:00.000Z')).id,'week-2026-10-14');
     assert.equal(challengeStatus(first,new Date(first.endsAt)),'closed');
   });
 
-  test('twenty upcoming weeks are contiguous and each boundary selects exactly its next challenge',async()=>{
+  test('twenty official launch weeks are contiguous and each boundary selects exactly its next challenge',async()=>{
     const {currentChallenge,weeklyChallenges,validateSchedule}=await import('../lib/weekly.ts');
-    validateSchedule();assert.equal(weeklyChallenges.length,21);
-    assert.equal(weeklyChallenges[1].startsAt,'2026-10-06T21:00:00.000Z');
+    validateSchedule();assert.equal(weeklyChallenges.length,20);
+    assert.equal(weeklyChallenges[1].startsAt,'2026-10-13T21:00:00.000Z');
     assert.equal(weeklyChallenges.at(-1).endsAt,'2027-02-23T21:00:00.000Z');
     const titles=new Set(),prompts=new Set();
     for(let i=0;i<weeklyChallenges.length;i++){
-      const week=weeklyChallenges[i];titles.add(week.title);
+      const week=weeklyChallenges[i];titles.add(week.title);assert.equal(week.number,String(i+1).padStart(2,'0'));
       assert.equal(currentChallenge(new Date(week.startsAt))?.id,week.id);
       assert.equal(currentChallenge(new Date(Date.parse(week.endsAt)-1))?.id,week.id);
       assert.equal(currentChallenge(new Date(week.endsAt))?.id,weeklyChallenges[i+1]?.id);
       assert.deepEqual(week.angles.map(x=>x.id),['change','reverse','what-if']);
       for(const angle of week.angles){prompts.add(angle.prompt);assert.ok(angle.hint.length>20);}
     }
-    assert.equal(titles.size,21);assert.equal(prompts.size,63);
+    assert.equal(titles.size,20);assert.equal(prompts.size,60);
     assert.equal(currentChallenge(new Date('2027-02-23T21:00:00.000Z')),null);
   });
 
   test('rollover freezes the old score, starts a clean current leaderboard and retains archives and lifetime XP',async()=>{
     const draft=newIdea();assert.equal((await post(draft)).status,200);
     state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(draft.id,'bob',1);
-    mock.timers.tick(Date.parse('2026-10-06T21:00:00.000Z')-Date.now());
-    state.databaseNow='2026-10-06T21:00:00.000Z';
+    mock.timers.tick(Date.parse('2026-10-13T21:00:00.000Z')-Date.now());
+    state.databaseNow='2026-10-13T21:00:00.000Z';
     const current=await read();
-    assert.equal(current.weekly.current.id,'week-2026-10-07');
+    assert.equal(current.weekly.current.id,'week-2026-10-14');
     assert.equal(current.weekly.current.number,'02');
-    assert.deepEqual(current.weekly.weeks.map(x=>x.id),['week-2026-10-07','week-2026-09-30']);
+    assert.deepEqual(current.weekly.weeks.map(x=>x.id),['week-2026-10-14','week-2026-10-07']);
     assert.equal(current.weekly.ownEntries,0);assert.equal(current.weekly.ownLikes,0);
     assert.equal(current.weekly.leaderTotal,0);assert.equal(current.ideas.length,0);assert.equal(current.progress.xp,20);
-    const archive=await read('week=week-2026-09-30');
+    const archive=await read('week=week-2026-10-07');
     assert.equal(archive.weekly.finalized,true);assert.equal(archive.weekly.leaders[0].likes,1);
     assert.equal(archive.ideas[0].id,draft.id);
     assert.equal((await post({...draft,action:'edit'})).status,409);
     state.user='bob';await setProfile('محمد');
     assert.equal((await post({action:'react',ideaId:draft.id,liked:false})).status,409);
     state.user='alice';
-    assert.equal((await post(newIdea({challengeId:'week-2026-10-07'}))).status,200);
+    assert.equal((await post(newIdea({challengeId:'week-2026-10-14'}))).status,200);
     assert.equal((await read()).weekly.ownEntries,1);
-    assert.equal((await read('week=week-2026-09-30')).weekly.leaders[0].likes,1);
+    assert.equal((await read('week=week-2026-10-07')).weekly.leaders[0].likes,1);
   });
 
   test('search treats wildcard input literally and matches authors',async()=>{
@@ -510,19 +558,19 @@ describe('Community operations against the real route and SQLite schema', () => 
   test('140 participants, paged rankings and long discussions remain bounded and complete',async()=>{
     const insert=state.db.prepare('INSERT INTO ideas (id,user_id,challenge_id,angle_id,name,title,body,created_at) VALUES (?,?,?,?,?,?,?,?)');
     let target;
-    for(let i=0;i<140;i++){const id=randomUUID();target??=id;insert.run(id,'participant-'+i,'week-2026-09-30','change','عضو '+i,'فكرة '+i,'شرح مفصل للحل المقترح.','2026-10-01T00:00:00.000Z');}
+    for(let i=0;i<140;i++){const id=randomUUID();target??=id;insert.run(id,'participant-'+i,'week-2026-10-07','change','عضو '+i,'فكرة '+i,'شرح مفصل للحل المقترح.','2026-10-01T00:00:00.000Z');}
     for(let i=0;i<55;i++)state.db.prepare('INSERT INTO comments VALUES (?,?,?,?,?,?)').run(randomUUID(),target,'alice','أحمد','تعليق مختلف لتطوير الفكرة.','2026-10-01T00:00:00.000Z');
     const first=await read('idea='+target);assert.equal(first.weekly.leaderTotal,140);assert.equal(first.weekly.leaders.length,20);assert.equal(first.focusedIdea.comments.length,20);assert.equal(first.discussion.pages,3);
     const names=new Set();for(let page=1;page<=7;page++){const data=await read('leaderPage='+page);for(const entry of data.weekly.leaders)names.add(entry.name);}
     assert.equal(names.size,140);
     const last=await read('idea='+target+'&commentPage=3');assert.equal(last.focusedIdea.comments.length,15);
-    const plans=state.db.prepare('EXPLAIN QUERY PLAN SELECT * FROM ideas WHERE challenge_id=? ORDER BY created_at DESC,id DESC LIMIT 12').all('week-2026-09-30');assert.ok(plans.some(row=>row.detail.includes('idx_ideas_week_created')));
+    const plans=state.db.prepare('EXPLAIN QUERY PLAN SELECT * FROM ideas WHERE challenge_id=? ORDER BY created_at DESC,id DESC LIMIT 12').all('week-2026-10-07');assert.ok(plans.some(row=>row.detail.includes('idx_ideas_week_created')));
   });
 
   test('finalization is atomic, repeat-safe, and preserves snapshots',async()=>{
     const {finalizeClosedWeeks}=await import('../lib/weekly-db.ts');const {database}=await import('./community-fixture.mjs');
     const draft=newIdea();await post(draft);state.user='bob';await setProfile('محمد');await post({action:'react',ideaId:draft.id,liked:true});
-    const afterClose=new Date('2026-10-07T00:00:00.000Z');await finalizeClosedWeeks(database(),afterClose);await finalizeClosedWeeks(database(),afterClose);
+    const afterClose=new Date('2026-10-14T00:00:00.000Z');await finalizeClosedWeeks(database(),afterClose);await finalizeClosedWeeks(database(),afterClose);
     const rows=state.db.prepare('SELECT * FROM weekly_results').all();assert.equal(rows.length,1);assert.equal(rows[0].likes,1);assert.equal(rows[0].rank,1);
     state.db.prepare('UPDATE reactions SET liked=0').run();await finalizeClosedWeeks(database(),afterClose);assert.equal(state.db.prepare('SELECT likes FROM weekly_results').get().likes,1);
     assert.equal((await read()).weekly.finalized,true);
@@ -533,7 +581,7 @@ describe('Community operations against the real route and SQLite schema', () => 
 test('sign-in returns to the precise view and unfinished action', () => {
   const id = randomUUID();
   for (const resume of [
-    { view: 'ideas', compose: 'week-2026-09-30',angle:'reverse' },
+    { view: 'ideas', compose: 'week-2026-10-07',angle:'reverse' },
     { view: 'profile', edit: id },
     { view: 'ideas', idea: id },
   ]) {
@@ -561,14 +609,16 @@ test('draft restoration keeps old drafts but ignores their old per-post name fie
 });
 
 
-test('legacy browser cleanup removes old and migrated drafts while preserving auth and new weekly drafts',()=>{
+test('launch browser cleanup removes test and legacy drafts while preserving auth and official drafts',()=>{
   const values=new Map([
     ['ftc-draft-queue','old'],['ftc-draft-reverse','old'],['ftc-draft-alone','old'],
-    ['ftc-draft-week-2026-09-30-change',JSON.stringify({legacyKey:'ftc-draft-queue'})],
-    ['ftc-draft-week-2026-09-30-reverse',JSON.stringify({title:'new'})],
+    ['ftc-draft-week-2026-09-30-change',JSON.stringify({title:'test'})],
+    ['ftc-draft-week-2026-09-30','old-test'],
+    ['ftc-draft-week-2026-10-07-change',JSON.stringify({legacyKey:'ftc-draft-queue'})],
+    ['ftc-draft-week-2026-10-07-reverse',JSON.stringify({title:'new'})],
     ['sb-existing-auth-token','existing-session'],['ftc-theme','dark'],['unrelated','keep'],
   ]);
   clearLegacyDrafts({get length(){return values.size;},key(i){return [...values.keys()][i]??null;},getItem(key){return values.get(key)??null;},removeItem(key){values.delete(key);}});
-  assert.deepEqual([...values.keys()],['ftc-draft-week-2026-09-30-reverse','sb-existing-auth-token','ftc-theme','unrelated']);
+  assert.deepEqual([...values.keys()],['ftc-draft-week-2026-10-07-reverse','sb-existing-auth-token','ftc-theme','unrelated']);
   assert.doesNotThrow(()=>clearLegacyDrafts({get length(){throw Error('Storage unavailable');}}));
 });

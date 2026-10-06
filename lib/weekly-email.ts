@@ -3,8 +3,9 @@ import { weeklyChallenges, findWeek } from './weekly';
 import { ensureWeeklyEmailSchema } from './weekly-email-schema';
 import { renderWeeklyEmail, type WeeklyEmailResult } from './weekly-email-template';
 
-// First close after the programme was approved; do not mail historical results.
-export const WEEKLY_EMAIL_START = '2026-10-06T21:00:00.000Z';
+// First official close: October 14, 00:00 Riyadh. Retain the test-send ledger
+// for duplicate protection, but never backfill or retry the retired test round.
+export const WEEKLY_EMAIL_START = '2026-10-13T21:00:00.000Z';
 const RETRY_WINDOW = 22 * 60 * 60 * 1000;
 const BATCH_SIZE = 5;
 type Payload = { from: string; to: string[]; subject: string; html: string; text: string };
@@ -110,7 +111,12 @@ export async function processWeeklyEmails(db: D1Database, mailer: WeeklyMailer, 
     let providerAccepted = false;
     try {
       const week = findWeek(job.challenge_id);
-      if (!week || week.endsAt > time) throw new WeeklyEmailError('week_not_closed', true);
+      if (!week || week.endsAt < WEEKLY_EMAIL_START) {
+        await db.prepare(`UPDATE weekly_email_deliveries SET status='skipped',last_error_code='test_round_retired',lease_token=NULL,lease_until=NULL
+          WHERE challenge_id=? AND user_id=? AND lease_token=?`).bind(job.challenge_id, job.user_id, lease).run();
+        summary.skipped++; continue;
+      }
+      if (week.endsAt > time) throw new WeeklyEmailError('week_not_closed', true);
       if(job.first_attempt_at && claimTime.getTime()-new Date(job.first_attempt_at).getTime()>=RETRY_WINDOW) throw new WeeklyEmailError('retry_window_expired',true);
       const email = await mailer.recipient(job.user_id);
       if (!email) {

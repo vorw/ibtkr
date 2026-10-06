@@ -1,4 +1,4 @@
-// Twenty upcoming challenges include the two already published in weekly.ts.
+// Twenty official launch challenges include the first two in weekly.ts.
 // These eighteen extend that reviewed schedule without overwriting past weeks.
 type ThinkingPrompt = { prompt: string; hint: string };
 export type ChallengeContent = {

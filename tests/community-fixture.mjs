@@ -1,14 +1,14 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 
-export const state = { user: null, db: null, failReads: false, failReadAfterWrite: false, databaseNow: '2026-10-05T12:00:00.000Z' };
+export const state = { user: null, db: null, failReads: false, failReadAfterWrite: false, databaseNow: '2026-10-12T12:00:00.000Z' };
 export function resetDatabase({ weekly = true } = {}) {
   state.db?.close();
   state.db = new DatabaseSync(':memory:');
   for (const file of ['../drizzle/0000_purple_toad.sql', '../drizzle/0001_unique_profiles.sql', ...(weekly ? ['../drizzle/0002_weekly_challenges.sql'] : [])]) {
     state.db.exec(readFileSync(new URL(file, import.meta.url), 'utf8'));
   }
-  state.databaseNow = '2026-10-05T12:00:00.000Z';
+  state.databaseNow = '2026-10-12T12:00:00.000Z';
   state.db.function('test_now', () => state.databaseNow);
   state.user = 'alice'; state.failReads = false; state.failReadAfterWrite = false;
 }

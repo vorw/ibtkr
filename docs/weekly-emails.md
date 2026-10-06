@@ -5,8 +5,8 @@ then send the approved Arabic congratulations to verified account owners whose
 final rank is 1, 2 or 3 and whose score is positive. Everyone tied at an eligible
 rank receives the same placement. Each message is addressed individually.
 
-The first eligible close is 7 October 2026 at 00:00 Riyadh (6 October 21:00 UTC).
-Previously completed challenges are not backfilled. This programme follows the
+The first eligible close is 14 October 2026 at 00:00 Riyadh (13 October 21:00 UTC).
+The September 30 test round is retired. Its sent-email receipts remain recorded for duplicate protection; pending test deliveries are skipped and never re-queued. Previously completed challenges are not backfilled. This programme follows the
 actual published `weeklyChallenges` schedule; new challenges must continue to be
 added to that schedule.
 

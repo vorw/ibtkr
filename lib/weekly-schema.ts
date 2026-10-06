@@ -1,5 +1,6 @@
 import migration from '../drizzle/0002_weekly_challenges.sql?raw';
 import legacyReset from '../drizzle/0003_clear_legacy_activity.sql?raw';
+import launchReset from '../drizzle/0005_launch_week_one.sql?raw';
 
 const migrationName = '0002_weekly_challenges.sql';
 const ready = new WeakMap<D1Database, Promise<void>>();
@@ -11,10 +12,21 @@ const statements = migration.split('--> statement-breakpoint').map(sql => sql.tr
 export async function ensureWeeklySchema(db: D1Database): Promise<void> {
   let task = ready.get(db);
   if (!task) {
-    task = upgrade(db).then(() => clearLegacyActivity(db));
+    task = upgrade(db).then(() => clearLegacyActivity(db)).then(() => archiveTestRound(db));
     ready.set(db, task);
   }
   try { await task; } catch (error) { ready.delete(db); throw error; }
+}
+
+async function archiveTestRound(db: D1Database) {
+  const name = '0005_launch_week_one.sql';
+  if (await db.prepare('SELECT name FROM d1_migrations WHERE name=?').bind(name).first()) return;
+  // Recoverable private backups and active-data removal commit together.
+  // Every statement is guarded so concurrent isolates cannot repeat the reset.
+  await db.batch([
+    ...launchReset.split('--> statement-breakpoint').map(sql => sql.trim()).filter(Boolean).map(sql => db.prepare(sql)),
+    db.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind(name),
+  ]);
 }
 
 async function clearLegacyActivity(db: D1Database) {

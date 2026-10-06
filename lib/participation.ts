@@ -41,7 +41,7 @@ export function readIdeaDraft(value: string | null): IdeaDraft | null {
 
 
 // Scope cleanup to old participation drafts. Never clear auth tokens, account
-// settings, themes, or drafts written for the new weekly programme.
+// settings, themes, or drafts written for the official weekly programme.
 export function clearLegacyDrafts(storage: Pick<Storage, 'length' | 'key' | 'getItem' | 'removeItem'>): void {
   const legacy = ['ftc-draft-queue', 'ftc-draft-reverse', 'ftc-draft-alone'];
   try {
@@ -49,7 +49,7 @@ export function clearLegacyDrafts(storage: Pick<Storage, 'length' | 'key' | 'get
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
       if (!key || !key.startsWith('ftc-draft-')) continue;
-      if (legacy.includes(key)) { remove.push(key); continue; }
+      if (legacy.includes(key) || key === 'ftc-draft-week-2026-09-30' || key.startsWith('ftc-draft-week-2026-09-30-')) { remove.push(key); continue; }
       try {
         if (legacy.includes(JSON.parse(storage.getItem(key) ?? 'null')?.legacyKey)) remove.push(key);
       } catch { /* Unrelated or malformed drafts are not reset. */ }

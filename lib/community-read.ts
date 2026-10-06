@@ -61,8 +61,8 @@ export async function readCommunity(db:D1Database,userId:string|null,params=new 
     ]);
     leaders=ranking.results.map(({user_id,...entry})=>({...entry,isOwn:user_id===userId}));ownEntries=mine?.entries??0;ownLikes=mine?.likes??0;
   }
-  const reset = await db.prepare('SELECT name FROM d1_migrations WHERE name=?').bind('0003_clear_legacy_activity.sql').first();
-  return {activityVersion:reset?'weekly-clean-start-2026-10-06':undefined,signedIn:Boolean(userId),ideas:rows.results.map(map),focusedIdea,discussion,
+  const reset = await db.prepare('SELECT name FROM d1_migrations WHERE name=?').bind('0005_launch_week_one.sql').first();
+  return {activityVersion:reset?'official-launch-2026-10-07':undefined,signedIn:Boolean(userId),ideas:rows.results.map(map),focusedIdea,discussion,
     profile:profile?{displayName:profile.display_name}:null,
     progress:{ideas:own?.total??0,reviews:reviews?.total??0,xp:(own?.rewarded??0)*20+(reviews?.total??0)*5},
     weekly:{current,selected,weeks:available,status,serverNow:now.toISOString(),leaders,leaderTotal,leaderPage,ownEntries,ownLikes,finalized},

@@ -4,19 +4,10 @@ export type WeeklyChallenge = { id: string; number: string; category: string; ti
 
 // Publish reviewed content here before its start. Dates are UTC; Wednesday
 // 00:00 in Riyadh is Tuesday 21:00 UTC. Never recycle IDs or overwrite past weeks.
+// The September 30 round was testing. Launch begins October 7; date-based
+// identifiers stay stable, while public numbering starts at 01.
 export const weeklyChallenges: WeeklyChallenge[] = [{
-  id: 'week-2026-09-30', number: '01', category: 'الحياة اليومية',
-  title: 'الانتظار… بس بطريقة ثانية.',
-  short: 'طابور طويل، وناس مستعجلة. كيف تغيّر التجربة؟',
-  description: 'تخيّل مطعمًا صغيرًا وقت الزحمة. الزبائن ينتظرون طلباتهم، وما يعرفون متى يجي دورهم. ابتكر تجربة تخلي الانتظار أقل إزعاجًا، بدون موظفين إضافيين. نفس الموقف، وثلاث زوايا تفتح لك حلول مختلفة.',
-  startsAt: '2026-09-29T21:00:00.000Z', endsAt: '2026-10-06T21:00:00.000Z',
-  angles: [
-    { id: 'change', label: 'غيّر القاعدة', icon: 'shuffle', prompt: 'لو الزبون ما يحتاج يوقف في الطابور أصلًا، كيف يعرف دوره ويستلم طلبه بدون تطبيق جديد؟', hint: 'غيّر طريقة ترتيب الدور أو توصيل المعلومة، مو بس سرعة الخدمة.' },
-    { id: 'reverse', label: 'اقلب الفكرة', icon: 'flip', prompt: 'تخيّل أسوأ تجربة انتظار ممكنة. اختر شيئين يخلّونها مزعجة، واقلبهم إلى حل قابل للتطبيق.', hint: 'ابدأ بالإزعاج: غموض الدور، أو الخوف من فواته. كيف يصير كل واحد منهم ميزة؟' },
-    { id: 'what-if', label: 'ماذا لو؟', icon: 'people', prompt: 'ماذا لو بعض الزبائن ما معهم جوال، وبعضهم ما يسمعون إعلان الأسماء؟ كيف تخلي حلّك واضحًا للجميع وبدون تكلفة كبيرة؟', hint: 'جرّب حلّك مع أكثر من شخص واحتياج. فكّر في شيء يُرى أو يُفهم بدون شرح طويل.' },
-  ],
-}, {
-  id: 'week-2026-10-07', number: '02', category: 'التجارب الرقمية',
+  id: 'week-2026-10-07', number: '01', category: 'التجارب الرقمية',
   title: 'إلغاء الاشتراك… بدون دوّامة.',
   short: 'المستخدم يبي يوقف الاشتراك، والخدمة تبي تعرف السبب. كيف توازن بينهم؟',
   description: 'شخص قرّر يوقف اشتراكه في خدمة رقمية. الشركة تبي تفهم السبب وتحافظ على علاقتها معه، لكن كثرة الخطوات تزعجه. صمّم تجربة تحترم قراره وتفيد الشركة، بدون إجباره يتواصل مع الدعم.',
@@ -27,7 +18,7 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     { id: 'what-if', label: 'ماذا لو؟', icon: 'people', prompt: 'ماذا لو المستخدم يجرب الإنترنت لأول مرة، وقراءته محدودة؟ كيف يتأكد أنه ألغى فعلًا، ويفهم متى تتوقف الرسوم؟', hint: 'اختبر وضوح الحل بدون مصطلحات تقنية أو اعتماد على اللون وحده.' },
   ],
 }, {
-  id: 'week-2026-10-14', number: '03', category: 'المجتمع',
+  id: 'week-2026-10-14', number: '02', category: 'المجتمع',
   title: 'جاي لحالك؟ مكانك موجود.',
   short: 'كيف تتحول أول خمس دقائق من إحراج إلى مشاركة مريحة؟',
   description: 'شخص وصل لفعالية جامعية لحاله، والموجودون يعرفون بعض. ابتكر تجربة بسيطة تساعده يشارك براحة، بدون تعريف بنفسه أمام الجميع، وبدون ميزانية إضافية.',
@@ -45,7 +36,7 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     {id:'reverse',label:'اقلب الفكرة',icon:'flip'},
     {id:'what-if',label:'ماذا لو؟',icon:'people'},
   ];
-  return {...content,id:'week-'+localDate,number:String(index+4).padStart(2,'0'),
+  return {...content,id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
     startsAt:new Date(start).toISOString(),endsAt:new Date(start+7*86400000).toISOString(),
     angles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
 })];
