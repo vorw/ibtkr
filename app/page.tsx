@@ -1,2 +1,3 @@
 import InnovationApp from './innovation-app';
-export default function Home() { return <InnovationApp />; }
+import OpeningGate from './opening-gate';
+export default function Home() { return <OpeningGate><InnovationApp /></OpeningGate>; }

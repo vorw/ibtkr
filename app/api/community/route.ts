@@ -6,6 +6,7 @@ import { ensureWeeklySchema } from '@/lib/weekly-schema';
 import { findWeek, currentChallenge } from '@/lib/weekly';
 import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
+import { readOpening } from '@/lib/opening';
 
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown, status = 200) => Response.json(data, {
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
   try {
     const user = await getParticipant(request);
     const db=database();
+    if(!(await readOpening(db,user?.userId??null)).isOpen)return reply({error:'الافتتاح ما اكتمل. شارك في قصّ الشريط أولًا.'},423);
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);
     return reply(await readCommunity(db,user?.userId??null,new URL(request.url).searchParams));
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
 
     const value = parsed.data;
     const db = database();
+    if(!(await readOpening(db,user.userId)).isOpen)return reply({error:'المشاركة تفتح بعد اكتمال الافتتاح.'},423);
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);
     const now = new Date().toISOString();

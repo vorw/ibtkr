@@ -21,5 +21,6 @@ jobs:
       - run: pnpm test:community
       - run: pnpm test:auth
       - run: pnpm test:weekly-email
+      - run: pnpm test:opening
       - run: pnpm exec tsc --noEmit
       - run: pnpm build

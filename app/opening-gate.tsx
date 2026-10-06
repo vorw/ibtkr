@@ -1,0 +1,133 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
+import { ArrowDown, ArrowUpLeft, Check, RotateCcw, Scissors, Sparkles } from 'lucide-react';
+import { sessionHeaders } from '@/lib/auth-client';
+import { signInHref } from '@/lib/participation';
+import type { OpeningState } from '@/lib/opening';
+
+const arabic=(n:number)=>new Intl.NumberFormat('ar-SA').format(n);
+async function requestOpening(cut=false):Promise<OpeningState>{
+  const headers=await sessionHeaders();
+  const response=await fetch('/api/opening',{method:cut?'POST':'GET',cache:'no-store',
+    headers:{...headers,...(cut?{'Content-Type':'application/json'}:{})},
+    ...(cut?{body:JSON.stringify({action:'cut'})}:{}),signal:AbortSignal.timeout(15000)});
+  const body=await response.json() as Partial<OpeningState>&{error?:string};
+  if(!response.ok)throw new Error(body.error??'تعذّر الاتصال. جرّب مرة ثانية.');
+  if(typeof body.eventId!=='string'||typeof body.target!=='number'||typeof body.count!=='number'||typeof body.isOpen!=='boolean'||typeof body.signedIn!=='boolean'||typeof body.hasCut!=='boolean')throw new Error('تعذّر قراءة حالة الافتتاح. جرّب مرة ثانية.');
+  return body as OpeningState;
+}
+
+const previewState:OpeningState={eventId:'visual-preview',target:2,count:0,isOpen:false,signedIn:true,hasCut:false,openedAt:null};
+export default function OpeningGate({children,preview=false}:{children:ReactNode;preview?:boolean}){
+  const [state,setState]=useState<OpeningState|null>(null);
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [drag,setDrag]=useState(0);
+  const [opening,setOpening]=useState(false);
+  const [entered,setEntered]=useState(false);
+  const started=useRef<{id:number;y:number}|null>(null);
+  const wasWaiting=useRef(false);
+  const mutation=useRef(false);
+  const alive=useRef(true);
+  const sequence=useRef(0);
+
+  const refresh=useCallback(async()=>{
+    if(preview){setState(current=>current??previewState);return;}
+    if(mutation.current)return;
+    const version=++sequence.current;
+    try{
+      const next=await requestOpening();
+      if(!alive.current||version!==sequence.current)return;
+      setState(current=>current?.isOpen?current:next);setError('');
+    }catch(e){if(alive.current&&version===sequence.current)setError(e instanceof Error?e.message:'تعذّر الاتصال.');}
+  },[preview]);
+  useEffect(()=>{
+    if(entered)return;
+    alive.current=true;void refresh();
+    if(preview)return()=>{alive.current=false;};
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},2000);
+    const onFocus=()=>{void refresh();};window.addEventListener('focus',onFocus);
+    return()=>{alive.current=false;clearInterval(timer);window.removeEventListener('focus',onFocus);};
+  },[refresh,entered,preview]);
+  useEffect(()=>{
+    if(!state)return;
+    if(!state.isOpen){wasWaiting.current=true;return;}
+    if(!wasWaiting.current){setEntered(true);return;}
+    setOpening(true);setDrag(0);
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer=setTimeout(()=>setEntered(true),reduced?450:2200);
+    return()=>clearTimeout(timer);
+  },[state?.isOpen]);
+
+  async function cut(){
+    if(mutation.current||!state?.signedIn||state.hasCut||state.isOpen)return;
+    mutation.current=true;++sequence.current;setBusy(true);setError('');
+    try{
+      const next=preview?{...state,count:Math.min(state.count+1,state.target),hasCut:true,isOpen:state.count+1>=state.target,openedAt:state.count+1>=state.target?new Date().toISOString():null}:await requestOpening(true);
+      if(alive.current){setState(next);setDrag(0);}
+    }catch(e){if(alive.current){setError(e instanceof Error?e.message:'تعذّر حفظ القصّة.');setDrag(0);void refresh();}}
+    finally{mutation.current=false;if(alive.current)setBusy(false);}
+  }
+  const canCut=Boolean(state?.signedIn&&!state.hasCut&&!state.isOpen&&!busy);
+  function pointerDown(event:PointerEvent<HTMLButtonElement>){
+    if(!canCut)return;
+    event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);
+    started.current={id:event.pointerId,y:event.clientY};setDrag(0);
+  }
+  function pointerMove(event:PointerEvent<HTMLButtonElement>){
+    if(!started.current||started.current.id!==event.pointerId)return;
+    setDrag(Math.max(0,Math.min(180,event.clientY-started.current.y)));
+  }
+  function pointerUp(event:PointerEvent<HTMLButtonElement>){
+    if(!started.current||started.current.id!==event.pointerId)return;
+    const distance=event.clientY-started.current.y;
+    started.current=null;
+    if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+    if(distance>=160){setDrag(180);void cut();}else setDrag(0);
+  }
+  function cancel(){started.current=null;setDrag(0);}
+
+  if(entered)return <>{children}</>;
+  const count=state?.count??0,target=state?.target??2;
+  const cutX=((Math.min(count,target-1)+1)/(target+1))*100;
+  const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`} as CSSProperties;
+  return <div className={`opening-page${opening?' is-opening':''}${state?.hasCut?' has-cut':''}`} dir="rtl" style={style}>
+    {preview&&<div className="opening-preview-label">معاينة بصرية · لا تغيّر الافتتاح الحقيقي</div>}
+    <header className="opening-header">
+      <div className="opening-brand"><img src="/assets/ftc-logo.svg" alt="نادي تقنية المستقبل" width="90" height="48"/><span/><strong>ابتكر<span>▪</span><small>لجنة الابتكار</small></strong></div>
+      <span className="opening-edition"><span className="opening-live-dot"/> لحظة البداية</span>
+    </header>
+    <main className="opening-main" id="main-content">
+      <div className="opening-copy"><span className="opening-eyebrow">قصّة صغيرة. بداية كبيرة.</span>
+        <h1>{opening?<>فتحناها<span>معًا.</span></>:<>البداية<span>بأيديكم.</span></>}</h1>
+        <p>{opening?'أهلًا في ابتكر. الفكرة القادمة تبدأ منك.':'شريط واحد، وبداية نصنعها معًا. قصّة منك، ونفتح ابتكر للجميع.'}</p>
+      </div>
+      <div className="opening-stage" aria-label="شريط افتتاح ابتكر">
+        <div className="opening-ribbon" aria-hidden="true">
+          <div className="ribbon-half ribbon-left"><span>IBTKR · ابتكر · IBTKR</span></div><div className="ribbon-half ribbon-right"><span>IBTKR · ابتكر · IBTKR</span></div>
+          {Array.from({length:count},(_,i)=><span key={i} className="ribbon-snip" style={{left:`${(i+1)/(target+1)*100}%`}}/>)}
+        </div>
+        {!state?.hasCut&&!opening&&<>
+          <span className="opening-cut-guide" aria-hidden="true"/>
+          <button className={`opening-scissors${drag>0?' is-dragging':''}`} aria-label="اسحب المقص للأسفل، أو اضغط Enter لقصّ الشريط" disabled={!canCut}
+            onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancel}
+            onClick={e=>{if(e.detail===0)void cut();}}><Scissors size={42} strokeWidth={1.6}/></button>
+          <span className="opening-drag-hint"><ArrowDown size={15}/>{busy?'نحفظ قصّتك…':'اسحب المقص للأسفل'}</span>
+        </>}
+        {state?.hasCut&&!opening&&<div className="opening-cut-thanks"><span><Check size={25}/></span><strong>قصّتك صارت جزءًا من البداية.</strong><small>باقي {arabic(Math.max(0,target-count))} ونفتحها معًا.</small></div>}
+        {opening&&<div className="opening-sparkles" aria-hidden="true">{Array.from({length:14},(_,i)=><i key={i} style={{'--i':i} as CSSProperties}/>)}</div>}
+      </div>
+      <section className="opening-participation" aria-label="تقدم الافتتاح" aria-live="polite">
+        <div className="opening-tally"><span className="opening-tally-number" dir="ltr">{arabic(count)}<span>/</span>{arabic(target)}</span><div><strong>{opening?'البداية اكتملت.':count?'أول قصّة وصلت.':'كن جزءًا من أول لحظة.'}</strong><p>{opening?'حياك في مساحة الأفكار.':'مشاركان يفتحان ابتكر للجميع.'}</p></div><div className="opening-dots" aria-hidden="true">{Array.from({length:target},(_,i)=><span key={i} className={i<count?'cut':''}>{i<count?<Check size={14}/>:arabic(i+1)}</span>)}</div></div>
+        {!state&&!error&&<p className="opening-connection" role="status">نجهّز لحظة البداية…</p>}
+        {state&&!state.signedIn&&!opening&&<a href={signInHref({view:'home'})} className="opening-signin" target="_top">سجّل دخولك وشارك في الافتتاح <ArrowUpLeft size={19}/></a>}
+        {canCut&&<button className="opening-accessible-cut" onClick={()=>void cut()}>أو اضغط هنا لقصّ الشريط <Scissors size={14}/></button>}
+        {state?.hasCut&&!opening&&<p className="opening-wait"><span/> ننتظر القصّة الثانية. الصفحة تتحدّث تلقائيًا.</p>}
+        {preview&&state?.hasCut&&!opening&&<button className="opening-accessible-cut" onClick={()=>setState(current=>current?{...current,hasCut:false}:current)}>جرّب القصّة الثانية كمشارك آخر <ArrowUpLeft size={14}/></button>}
+        {error&&<div className="opening-error" role="alert"><p>{error}</p><button onClick={()=>void refresh()}><RotateCcw size={14}/> إعادة المحاولة</button></div>}
+      </section>
+    </main>
+    <footer className="opening-footer"><span>الفكرة القادمة قد تبدأ منك.</span><span dir="ltr">FTC / IBTKR <Sparkles size={13}/></span></footer>
+  </div>;
+}

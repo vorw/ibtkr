@@ -15,6 +15,7 @@ registerHooks({ resolve(specifier, context, next) {
     '@/lib/weekly':'../lib/weekly.ts',
     '@/lib/community-read':'../lib/community-read.ts',
     '@/lib/weekly-schema':'../lib/weekly-schema.ts',
+    '@/lib/opening':'../lib/opening.ts',
     './weekly':'../lib/weekly.ts',
     './weekly-content':'../lib/weekly-content.ts',
     './weekly-db':'../lib/weekly-db.ts',
