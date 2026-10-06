@@ -10,8 +10,8 @@ export function resetDatabase({ weekly = true, opened = true } = {}) {
   }
   state.db.exec(readFileSync(new URL('../drizzle/0006_opening_ceremony.sql',import.meta.url),'utf8'));
   if(opened){
-    state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run('ribbon-sound-test-2026-10-07',2,'2026-10-06T21:00:00.000Z');
-    for(const user of ['fixture-opener-1','fixture-opener-2'])state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run('ribbon-sound-test-2026-10-07',user,'2026-10-06T21:00:00.000Z');
+    state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run('ribbon-celebration-test-2026-10-07',2,'2026-10-06T21:00:00.000Z');
+    for(const user of ['fixture-opener-1','fixture-opener-2'])state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run('ribbon-celebration-test-2026-10-07',user,'2026-10-06T21:00:00.000Z');
   }
   state.databaseNow = '2026-10-12T12:00:00.000Z';
   state.db.function('test_now', () => state.databaseNow);

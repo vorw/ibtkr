@@ -1,0 +1,46 @@
+/* Atmospheric movement keeps the ceremony alive without competing with the cut. */
+.opening-atmosphere{position:absolute;inset:0;overflow:hidden;pointer-events:none;contain:paint}
+.opening-aura{position:absolute;width:min(70vw,850px);aspect-ratio:1;border-radius:50%;opacity:.72;animation:ceremony-aura 14s ease-in-out infinite alternate;will-change:transform}
+.aura-violet{left:-23%;top:10%;background:radial-gradient(circle,#9b79db28,transparent 67%)}
+.aura-gold{right:-24%;top:0;background:radial-gradient(circle,#e8c98226,transparent 66%);animation-delay:-6s;animation-duration:18s}
+.aura-lilac{left:28%;bottom:-35%;background:radial-gradient(circle,#9d79dc24,transparent 67%);animation-delay:-10s;animation-duration:20s}
+.opening-orbit{position:absolute;width:90vw;aspect-ratio:1;border:1px solid #9774d012;border-radius:50%;left:5%;top:10%;transform:rotate(-28deg) scaleY(.47);animation:ceremony-orbit 22s ease-in-out infinite alternate}
+.orbit-two{width:120vw;left:-10%;top:-7%;border-style:dashed;opacity:.65;animation-delay:-11s;animation-duration:28s}
+.opening-glint{position:absolute;left:var(--x);top:var(--y);width:5px;height:5px;background:#9774d056;transform:rotate(45deg);animation:ceremony-float var(--duration) ease-in-out infinite;animation-delay:var(--delay)}
+.opening-glint:nth-of-type(3n){width:10px;height:10px;background:none;border:1px solid #b49dcb65;border-radius:50%}
+.opening-glint:nth-of-type(4n){background:#c5aa605c;width:4px;height:9px}
+.opening-atmosphere::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#895ccc20,transparent 65%);opacity:calc(.2 + var(--drag-energy)*.8);transition:opacity .15s}
+.opening-copy{animation:ceremony-entrance .9s cubic-bezier(.2,.7,.2,1) both}
+.opening-live-dot,.opening-wait>span{animation:ceremony-live 2.8s ease-in-out infinite}
+.opening-scissors:not(:disabled):not(.is-dragging){animation:ceremony-scissors 2.7s ease-in-out infinite}
+.opening-scissors.is-dragging{background:#f3ecff;transform:translateX(-50%) scale(1.08)}
+.opening-ribbon-sheen{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2}
+.opening-ribbon-sheen::before{content:'';position:absolute;inset:-50% auto -50% -40%;width:30%;background:linear-gradient(90deg,transparent,#e5d4ff38,transparent);transform:skewX(-24deg);animation:ceremony-sheen 6.5s ease-in-out infinite}
+.opening-cut-wave{position:absolute;left:var(--burst-x);top:160px;width:70px;height:70px;border:1px solid #9e77d9;border-radius:50%;pointer-events:none;z-index:3;animation:ceremony-cut-wave .9s ease-out both}
+.opening-tally-number{animation:ceremony-count .5s ease-out}
+.opening-dots>.cut{box-shadow:0 0 0 5px #9975d010;transition:background .25s,box-shadow .25s}
+.opening-celebration{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2;contain:paint}
+.opening-reveal-glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 56%,#bc96f650,#eedca72c 30%,transparent 68%);animation:ceremony-reveal-glow 2.8s ease-out both}
+.opening-reveal-ring{position:absolute;left:50%;top:56%;width:160px;height:160px;border:1px solid #9770d580;border-radius:50%;animation:ceremony-reveal-ring 2.2s cubic-bezier(.15,.65,.3,1) both}
+.ring-delayed{animation-delay:.2s;border-color:#cbb36e80}
+.opening-party-piece{position:absolute;left:var(--x);top:58%;width:7px;height:15px;background:#9771d2;border-radius:1px;animation:ceremony-party 2.9s cubic-bezier(.18,.7,.35,1) both;animation-delay:var(--delay)}
+.opening-party-piece:nth-of-type(3n){background:#c8ae67;width:5px;height:11px}
+.opening-party-piece:nth-of-type(4n){background:#a7bd87;width:8px;height:8px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.opening-party-piece:nth-of-type(5n){background:#bea4e6;width:4px;height:22px}
+.is-opening .opening-ribbon-sheen{opacity:0}.is-opening .opening-atmosphere{animation:ceremony-room-brighten 2.6s ease-out both}
+.is-opening .opening-copy,.is-opening .opening-tally{animation:ceremony-entrance 1s .1s ease-out both}
+@keyframes ceremony-aura{from{transform:translate3d(-3%,-2%,0) scale(.94)}to{transform:translate3d(15%,12%,0) scale(1.15)}}
+@keyframes ceremony-orbit{from{transform:rotate(-28deg) scaleY(.47)}to{transform:rotate(-14deg) scaleY(.59)}}
+@keyframes ceremony-float{0%,100%{opacity:.2;transform:translate3d(0,8px,0) rotate(var(--rotation))}50%{opacity:.8;transform:translate3d(15px,-28px,0) rotate(calc(var(--rotation) + 65deg))}}
+@keyframes ceremony-entrance{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ceremony-live{0%,100%{box-shadow:0 0 0 4px #9975d010}50%{box-shadow:0 0 0 8px #9975d008}}
+@keyframes ceremony-scissors{0%,100%{box-shadow:0 7px 22px #36204912,0 0 0 0 #9975d000}50%{box-shadow:0 9px 26px #36204920,0 0 0 9px #9975d009}}
+@keyframes ceremony-sheen{0%,30%{left:-40%;opacity:0}38%{opacity:1}75%,100%{left:135%;opacity:0}}
+@keyframes ceremony-cut-wave{from{opacity:.7;transform:translate(-50%,-50%) scale(.3)}to{opacity:0;transform:translate(-50%,-50%) scale(4)}}
+@keyframes ceremony-count{from{opacity:.55;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+@keyframes ceremony-reveal-glow{0%{opacity:0;transform:scale(.6)}25%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
+@keyframes ceremony-reveal-ring{from{opacity:.75;transform:translate(-50%,-50%) scale(.3)}to{opacity:0;transform:translate(-50%,-50%) scale(9)}}
+@keyframes ceremony-party{0%{opacity:0;transform:translate3d(0,0,0) rotate(0)}10%{opacity:1}35%{transform:translate3d(calc(var(--drift)*.6),-220px,0) rotate(calc(var(--spin)*.45))}75%{opacity:.9}100%{opacity:0;transform:translate3d(var(--drift),420px,0) rotate(var(--spin))}}
+@keyframes ceremony-room-brighten{0%{opacity:1}35%{opacity:.45}100%{opacity:.7}}
+@media(max-width:600px){.opening-aura{width:110vw}.opening-orbit{width:160vw;left:-30%}.orbit-two{width:200vw;left:-50%}.opening-party-piece:nth-of-type(n+21){display:none}.opening-glint:nth-of-type(n+13){display:none}}
+@media(prefers-reduced-motion:reduce){.opening-atmosphere *,.opening-atmosphere::after,.opening-ribbon-sheen::before{animation:none!important;transition:none!important}.opening-celebration,.opening-cut-wave,.opening-ribbon-sheen{display:none}.opening-aura{will-change:auto}.opening-glint{opacity:.3}.opening-copy,.opening-tally-number{animation:none!important}}
