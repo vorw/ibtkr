@@ -20,5 +20,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:community
       - run: pnpm test:auth
+      - run: pnpm test:weekly-email
       - run: pnpm exec tsc --noEmit
       - run: pnpm build

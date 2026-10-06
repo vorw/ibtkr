@@ -489,3 +489,10 @@ body, .site-header, .mission-hero, .player-panel, .achievement-panel, .profile-n
 }
 
 .angle-invitation { margin: 0 0 24px; padding: 18px 20px; border: 1px dashed var(--line); color: var(--soft); font-size: .9375rem; line-height: 1.85; }
+.week-change-notice{display:flex;align-items:center;gap:16px;padding:18px 20px;margin-bottom:24px;border:1px solid var(--line);border-inline-start:3px solid var(--violet);background:var(--card);animation:angle-enter .4s var(--ease) both}
+.week-change-notice>svg{color:var(--violet);flex-shrink:0}
+.week-change-notice>div{flex:1;min-width:0}
+.week-change-notice strong{font-size:1rem;font-weight:500;line-height:1.7}
+.week-change-notice p{margin:4px 0 0;font-size:.9375rem;color:var(--soft);line-height:1.8}
+.week-notice-close{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;background:none;border:0;color:var(--soft)}
+@media(max-width:600px){.week-change-notice{flex-wrap:wrap;padding:16px;gap:12px}.week-change-notice>div{flex-basis:calc(100% - 40px)}.week-change-notice>.outline-button{margin-inline-start:34px}.week-notice-close{margin-inline-start:auto}}

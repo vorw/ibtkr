@@ -149,6 +149,9 @@ export default function InnovationApp() {
   const [commentPage,setCommentPage]=useState(1);
   const [openedIdea,setOpenedIdea]=useState<Idea|null>(null);
   const [tick,setTick]=useState(Date.now());
+  const [closedWeek,setClosedWeek]=useState<Challenge|null>(null);
+  const observedWeek=useRef<Challenge|null>(null);
+  const serverOffset=useRef(0);
   const queryRef=useRef(new URLSearchParams());
   const commentId = useRef('');
   const origin = useRef<HTMLElement | null>(null);
@@ -174,6 +177,8 @@ export default function InnovationApp() {
       const result = await requestCommunity(undefined,queryRef.current) as AppData;
       if (version !== refreshVersion.current) return null;
       if (result.activityVersion) { try { clearLegacyDrafts(localStorage); } catch {} }
+      const serverTime=Date.parse(result.weekly.serverNow);
+      if(Number.isFinite(serverTime)){serverOffset.current=serverTime-Date.now();setTick(serverTime);}
       setData(result); setError(''); return result;
     } catch (caught) {
       if (version === refreshVersion.current) {
@@ -205,11 +210,13 @@ export default function InnovationApp() {
   useEffect(() => {
     const resume = readResume(window.location.search);
     pendingResume.current = resume;
+    if(resume.week && findWeek(resume.week)){setWeekFilter(resume.week);queryRef.current.set('week',resume.week);}
     setTab(resume.view);if(resume.idea||resume.edit){setSelected(resume.idea??resume.edit??null);queryRef.current.set('idea',resume.idea??resume.edit!);}
     void refresh();
     const onFocus = () => { if (document.visibilityState === 'visible') void refresh(); };
     const onBack = () => {
       const destination = readResume(window.location.search);
+      setWeekFilter(destination.week && findWeek(destination.week) ? destination.week : 'current');
       setTab(destination.view); setCompose(null); setSelected(null);
     };
     window.addEventListener('focus', onFocus);
@@ -229,7 +236,9 @@ export default function InnovationApp() {
     else if (data.signedIn && (resume.idea || resume.edit)) toast.error('هذه الفكرة غير متاحة في القائمة الحالية.');
     if (data.signedIn) {
       const destination = challenge && !challenge.angles.some(item => item.id === resume.angle) ? 'home' : resume.view;
-      window.history.replaceState(null, '', '/?view=' + destination);
+      const params = new URLSearchParams({view:destination});
+      if(resume.week && findWeek(resume.week))params.set('week',resume.week);
+      window.history.replaceState(null, '', '/?' + params);
     }
   }, [data, error, loading]);
 
@@ -249,8 +258,30 @@ export default function InnovationApp() {
   }, [data.profile?.displayName]);
 
   useEffect(()=>{const timer=setTimeout(()=>{if(!selected)setLoading(true);void refresh();},search?250:0);return()=>clearTimeout(timer);},[queryKey,refresh]);
-  useEffect(()=>{const timer=setInterval(()=>{setTick(Date.now());if(document.visibilityState==='visible'&&(tab==='leaderboard'||tab==='ideas'))void refresh();},30000);return()=>clearInterval(timer);},[tab,refresh]);
-  useEffect(()=>{if(mission && remaining===0)void refresh();},[mission?.id,remaining===0,refresh]);
+  useEffect(()=>{const timer=setInterval(()=>{
+    const now=Date.now()+serverOffset.current;setTick(now);
+    if(document.visibilityState==='visible'&&(tab==='leaderboard'||tab==='ideas'||(mission&&Date.parse(mission.endsAt)<=now)))void refresh();
+  },30000);return()=>clearInterval(timer);},[tab,refresh,mission?.endsAt]);
+  useEffect(()=>{
+    if(!mission)return;
+    const delay=Date.parse(mission.endsAt)-(Date.now()+serverOffset.current);
+    if(delay<=0){void refresh();return;}
+    const timer=setTimeout(()=>{setTick(Date.parse(mission.endsAt));void refresh();},Math.min(delay+100,2147483647));
+    return()=>clearTimeout(timer);
+  },[mission?.id,mission?.endsAt,data.weekly.serverNow,refresh]);
+  useEffect(()=>{
+    if(loading||error)return;
+    const previous=observedWeek.current;
+    const current=data.weekly.current;
+    if(previous&&previous.id!==current?.id&&previous.endsAt<=data.weekly.serverNow){
+      setClosedWeek(previous);
+      if(compose?.id===previous.id){
+        setCompose(null);setFormError('');
+        toast.info('انتهى وقت التحدّي. مسودتك محفوظة لهذا الأسبوع، والتحدّي الجديد له مشاركة جديدة.');
+      }
+    }
+    observedWeek.current=current;
+  },[data.weekly.current?.id,data.weekly.serverNow,loading,error]);
 
   useEffect(() => { setMissionIndex(null); }, [mission?.id]);
   useEffect(() => {
@@ -269,13 +300,16 @@ export default function InnovationApp() {
     if (tab !== 'home') changeTab('home');
   }
 
-  function changeTab(value: string) {
+  function changeTab(value: string, weekId?:string) {
     if (!nav.some(item => item.id === value)) return;
-    if (value === tab) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    if (value === tab&&!weekId) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     transition.current?.skipTransition();
     const update = () => {
       flushSync(() => setTab(value as Page));
-      window.history.pushState(null, '', '/?view=' + value);
+      const params=new URLSearchParams({view:value});
+      const archive=weekId??weekFilter;
+      if((value==='leaderboard'||value==='ideas')&&findWeek(archive))params.set('week',archive);
+      window.history.pushState(null, '', '/?' + params);
       window.scrollTo({ top: 0, behavior: 'instant' });
     };
     const doc = document as Document & { startViewTransition?: (callback: () => void) => { skipTransition: () => void; ready: Promise<void>; finished: Promise<void> } };
@@ -286,8 +320,13 @@ export default function InnovationApp() {
       void scene.finished.catch(() => {}).then(() => { if (transition.current === scene) transition.current = null; });
     } else update();
     if(value==='home'){setWeekFilter('current');setFilter('all');setAngleFilter('all');setSearch('');setSort('newest');setPage(1);setLeaderPage(1);}
-    if(value==='leaderboard' && (weekFilter==='legacy'||weekFilter==='all')){setWeekFilter('current');setLeaderPage(1);}
+    if(weekId){setWeekFilter(weekId);setLeaderPage(1);}
+    else if(value==='leaderboard' && (weekFilter==='legacy'||weekFilter==='all')){setWeekFilter('current');setLeaderPage(1);}
     void refresh();
+  }
+  function showClosedResults(week:Challenge){
+    setWeekFilter(week.id);setLeaderPage(1);setSelected(null);setCompose(null);
+    changeTab('leaderboard',week.id);
   }
   function rememberOrigin() {
     const element = document.activeElement as HTMLElement;
@@ -426,15 +465,16 @@ export default function InnovationApp() {
       <header className="site-header"><div className="header-inner">
         <button className="brand" onClick={() => changeTab('home')} aria-label="ابتكر، الرئيسية"><img src="/assets/ftc-logo.svg" alt="نادي تقنية المستقبل" width="90" height="48" /><span className="brand-cut" /><span className="brand-product"><strong>ابتكر<span>▪</span></strong><small>لجنة الابتكار</small></span></button>
         <TabsList className="main-nav" aria-label="التنقل الرئيسي" data-page={tab}><span className="nav-active" aria-hidden="true" />{nav.map((item) => <TabsTrigger key={item.id} value={item.id}>{item.label}</TabsTrigger>)}</TabsList>
-        <div className="header-end"><span className="beta-label">نسخة تجريبية</span><ThemeToggle />{data.signedIn && <button className="header-login" disabled={busy} onClick={() => void logout()}>خروج</button>}{!loading && !data.signedIn ? <a className="header-login" href={signInHref({ view: tab })} target="_top">دخول <ArrowUpLeft size={17} /></a> : <button className="header-xp" onClick={() => changeTab('profile')} aria-label={`رحلتك، ${data.progress.xp} نقطة`}><Sparkles size={15} /><b>{data.progress.xp}</b><span lang="en">XP</span></button>}</div>
+        <div className="header-end"><span className="beta-label">نسخة تجريبية</span><ThemeToggle />{data.signedIn && <button className="header-login" disabled={busy} onClick={() => void logout()}>خروج</button>}{!loading && !data.signedIn ? <a className="header-login" href={signInHref({ view: tab, ...(findWeek(weekFilter)?{week:weekFilter}:{}) })} target="_top">دخول <ArrowUpLeft size={17} /></a> : <button className="header-xp" onClick={() => changeTab('profile')} aria-label={`رحلتك، ${data.progress.xp} نقطة`}><Sparkles size={15} /><b>{data.progress.xp}</b><span lang="en">XP</span></button>}</div>
       </div></header>
 
       <main className="workspace" id="main-content" data-activity-version={data.activityVersion} tabIndex={-1}>
         {error && <div className="system-banner error" role="alert"><span>{error}</span><button onClick={() => void refresh()}>إعادة المحاولة</button></div>}
+        {closedWeek&&<div className="week-change-notice" role="status"><Trophy size={22}/><div><strong>انتهى تحدّي الأسبوع {closedWeek.number}.</strong><p>{data.weekly.current?'النتائج محفوظة، والتحدّي الجديد جاهز.':'النتائج محفوظة. ننتظرك في التحدّي القادم.'}</p></div><Button className="outline-button" onClick={()=>showClosedResults(closedWeek)}>شاهد النتائج</Button><button className="week-notice-close" aria-label="إغلاق إشعار نهاية الأسبوع" onClick={()=>setClosedWeek(null)}><X size={18}/></button></div>}
         <TabsContent value="home" className="page-stage">
           <div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>
           {mission ? <section className="mission-layout weekly-layout" aria-label="تحدّي الأسبوع">
-            <article className="mission-hero tone-violet" onPointerMove={moveSpotlight}>
+            <article key={mission.id} className="mission-hero tone-violet" onPointerMove={moveSpotlight}>
               <div className="hero-grid" aria-hidden="true"/>
               <div className="mission-topline"><span className="week-marker"><span>الأسبوع</span><b className="week-number" dir="ltr">{mission.number}</b></span><span className="week-status"><Clock3 size={15}/> ينتهي الثلاثاء، ١١:٥٩ م</span></div>
               <div className="mission-copy"><span className="mission-type">{mission.category}</span><h1>{headline ? <><span>{headline[1]}</span><span>{headline[2]}</span></> : mission.title}</h1><p>{mission.description}</p></div>
@@ -447,12 +487,12 @@ export default function InnovationApp() {
               <section className="weekly-score-panel"><Trophy size={23}/><div><small>{data.signedIn?'مشاركتك هذا الأسبوع':'مبتكر الأسبوع'}</small><strong>{data.signedIn?`${data.weekly.ownEntries} مشاركة · ${data.weekly.ownLikes} إعجاب`:'باختيار المجتمع'}</strong></div><button className="panel-link" onClick={()=>changeTab('leaderboard')}>شاهد المتصدرين</button></section>
             </aside>
           </section> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
-          <Reveal className="community-preview section-block"><div className="section-heading"><div><span className="eyebrow">من المجتمع</span><h2>فكرة منك.<br/><span>وزاوية من غيرك.</span></h2></div><div className="section-aside"><p>اقرأ الحلول، ناقشها، وصوّت للفكرة اللي تلفتك.</p><button className="text-link" onClick={()=>{setWeekFilter('current');setAngleFilter('all');setSearch('');setPage(1);setFilter('all');changeTab('ideas')}}>شاهد المشاركات</button></div></div>{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas'})}/>:data.ideas.length?<div className="idea-grid">{ideaCards(data.ideas.slice(0,3))}</div>:<EmptyState onStart={()=>changeTab('home')}/>}</Reveal>
+          <Reveal className="community-preview section-block"><div className="section-heading"><div><span className="eyebrow">من المجتمع</span><h2>فكرة منك.<br/><span>وزاوية من غيرك.</span></h2></div><div className="section-aside"><p>اقرأ الحلول، ناقشها، وصوّت للفكرة اللي تلفتك.</p><button className="text-link" onClick={()=>{setWeekFilter('current');setAngleFilter('all');setSearch('');setPage(1);setFilter('all');changeTab('ideas')}}>شاهد المشاركات</button></div></div>{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas',...(findWeek(weekFilter)?{week:weekFilter}:{})})}/>:data.ideas.length?<div className="idea-grid">{ideaCards(data.ideas.slice(0,3))}</div>:<EmptyState onStart={()=>changeTab('home')}/>}</Reveal>
         </TabsContent>
 
         <TabsContent value="ideas" className="page-stage"><header className="page-header"><div><span className="eyebrow">حلول المجتمع</span><h1>نفس المشكلة.<br/>أفكار ما تتشابه.</h1></div>{mission&&<Button className="launch-button" onClick={()=>start(mission)}>شارك حلّك <Plus size={20}/></Button>}</header>
           <div className="community-controls"><div className="search-field"><Search size={18}/><Input aria-label="ابحث بالعنوان أو المشارك" placeholder="ابحث عن فكرة أو مشارك…" value={search} onChange={event=>{setSearch(event.target.value);setPage(1)}}/></div><div className="filter-selects"><label>الأسبوع<NativeSelect value={weekFilter} onChange={event=>{setWeekFilter(event.target.value);setAngleFilter('all');setPage(1);setLeaderPage(1)}}><NativeSelectOption value="current">الأسبوع الحالي</NativeSelectOption>{data.weekly.weeks.map(week=><NativeSelectOption key={week.id} value={week.id}>الأسبوع {week.number} · {week.title}</NativeSelectOption>)}<NativeSelectOption value="all">كل الأسابيع</NativeSelectOption></NativeSelect></label><label>الزاوية<NativeSelect value={angleFilter} onChange={event=>{setAngleFilter(event.target.value);setPage(1)}}><NativeSelectOption value="all">كل الزوايا</NativeSelectOption>{weeklyChallenges[0].angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect></label><label>الترتيب<NativeSelect value={sort} onChange={event=>{setSort(event.target.value);setPage(1)}}><NativeSelectOption value="newest">الأحدث</NativeSelectOption><NativeSelectOption value="popular">الأكثر إعجابًا</NativeSelectOption></NativeSelect></label></div></div>
-          <Tabs dir="rtl" value={filter} onValueChange={value=>{setFilter(value);setPage(1)}} className="feed-tabs"><div className="feed-toolbar"><TabsList aria-label="تصفية المشاركات"><TabsTrigger value="all">كل المشاركات</TabsTrigger><TabsTrigger value="mine">مشاركاتي</TabsTrigger></TabsList><span aria-live="polite">{loading?'جارٍ التحميل…':`${data.pagination.total} مشاركة`}</span></div><TabsContent value={filter} key={filter+'-'+page} className="feed-content">{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas'})}/>:feed.length?<><div className="idea-grid">{ideaCards(feed)}</div><PageControls page={data.pagination.page} pages={data.pagination.pages} onPage={setPage}/></>:<div className="empty-state"><Lightbulb size={28}/><div><strong>ما فيه مشاركات تطابق اختيارك.</strong><p>جرّب تغيير البحث أو الزاوية، أو ابدأ بحلّك.</p></div><Button className="outline-button" onClick={()=>{setSearch('');setAngleFilter('all');setFilter('all');setPage(1)}}>عرض كل المشاركات</Button></div>}</TabsContent></Tabs>
+          <Tabs dir="rtl" value={filter} onValueChange={value=>{setFilter(value);setPage(1)}} className="feed-tabs"><div className="feed-toolbar"><TabsList aria-label="تصفية المشاركات"><TabsTrigger value="all">كل المشاركات</TabsTrigger><TabsTrigger value="mine">مشاركاتي</TabsTrigger></TabsList><span aria-live="polite">{loading?'جارٍ التحميل…':`${data.pagination.total} مشاركة`}</span></div><TabsContent value={filter} key={filter+'-'+page} className="feed-content">{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas',...(findWeek(weekFilter)?{week:weekFilter}:{})})}/>:feed.length?<><div className="idea-grid">{ideaCards(feed)}</div><PageControls page={data.pagination.page} pages={data.pagination.pages} onPage={setPage}/></>:<div className="empty-state"><Lightbulb size={28}/><div><strong>ما فيه مشاركات تطابق اختيارك.</strong><p>جرّب تغيير البحث أو الزاوية، أو ابدأ بحلّك.</p></div><Button className="outline-button" onClick={()=>{setSearch('');setAngleFilter('all');setFilter('all');setPage(1)}}>عرض كل المشاركات</Button></div>}</TabsContent></Tabs>
         </TabsContent>
 
         <TabsContent value="leaderboard" className="page-stage"><header className="page-header"><div><span className="eyebrow">باختيار المجتمع</span><h1>{data.weekly.finalized?'مبتكر الأسبوع.':'من يتصدّر الأسبوع؟'}</h1></div><label className="leader-week-select">الأسبوع<NativeSelect value={weekFilter} onChange={event=>{setWeekFilter(event.target.value);setLeaderPage(1)}}><NativeSelectOption value="current">الأسبوع الحالي</NativeSelectOption>{data.weekly.weeks.map(week=><NativeSelectOption key={week.id} value={week.id}>الأسبوع {week.number}</NativeSelectOption>)}</NativeSelect></label></header>

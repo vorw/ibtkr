@@ -16,6 +16,7 @@ registerHooks({ resolve(specifier, context, next) {
     '@/lib/community-read':'../lib/community-read.ts',
     '@/lib/weekly-schema':'../lib/weekly-schema.ts',
     './weekly':'../lib/weekly.ts',
+    './weekly-content':'../lib/weekly-content.ts',
     './weekly-db':'../lib/weekly-db.ts',
   };
   if (aliases[specifier]) return { url: new URL(aliases[specifier], import.meta.url).href, shortCircuit: true };
@@ -456,6 +457,47 @@ describe('Community operations against the real route and SQLite schema', () => 
     assert.equal(currentChallenge(new Date('2026-10-06T20:59:59.999Z')).id,first.id);
     assert.equal(currentChallenge(new Date('2026-10-06T21:00:00.000Z')).id,'week-2026-10-07');
     assert.equal(challengeStatus(first,new Date(first.endsAt)),'closed');
+  });
+
+  test('twenty upcoming weeks are contiguous and each boundary selects exactly its next challenge',async()=>{
+    const {currentChallenge,weeklyChallenges,validateSchedule}=await import('../lib/weekly.ts');
+    validateSchedule();assert.equal(weeklyChallenges.length,21);
+    assert.equal(weeklyChallenges[1].startsAt,'2026-10-06T21:00:00.000Z');
+    assert.equal(weeklyChallenges.at(-1).endsAt,'2027-02-23T21:00:00.000Z');
+    const titles=new Set(),prompts=new Set();
+    for(let i=0;i<weeklyChallenges.length;i++){
+      const week=weeklyChallenges[i];titles.add(week.title);
+      assert.equal(currentChallenge(new Date(week.startsAt))?.id,week.id);
+      assert.equal(currentChallenge(new Date(Date.parse(week.endsAt)-1))?.id,week.id);
+      assert.equal(currentChallenge(new Date(week.endsAt))?.id,weeklyChallenges[i+1]?.id);
+      assert.deepEqual(week.angles.map(x=>x.id),['change','reverse','what-if']);
+      for(const angle of week.angles){prompts.add(angle.prompt);assert.ok(angle.hint.length>20);}
+    }
+    assert.equal(titles.size,21);assert.equal(prompts.size,63);
+    assert.equal(currentChallenge(new Date('2027-02-23T21:00:00.000Z')),null);
+  });
+
+  test('rollover freezes the old score, starts a clean current leaderboard and retains archives and lifetime XP',async()=>{
+    const draft=newIdea();assert.equal((await post(draft)).status,200);
+    state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(draft.id,'bob',1);
+    mock.timers.tick(Date.parse('2026-10-06T21:00:00.000Z')-Date.now());
+    state.databaseNow='2026-10-06T21:00:00.000Z';
+    const current=await read();
+    assert.equal(current.weekly.current.id,'week-2026-10-07');
+    assert.equal(current.weekly.current.number,'02');
+    assert.deepEqual(current.weekly.weeks.map(x=>x.id),['week-2026-10-07','week-2026-09-30']);
+    assert.equal(current.weekly.ownEntries,0);assert.equal(current.weekly.ownLikes,0);
+    assert.equal(current.weekly.leaderTotal,0);assert.equal(current.ideas.length,0);assert.equal(current.progress.xp,20);
+    const archive=await read('week=week-2026-09-30');
+    assert.equal(archive.weekly.finalized,true);assert.equal(archive.weekly.leaders[0].likes,1);
+    assert.equal(archive.ideas[0].id,draft.id);
+    assert.equal((await post({...draft,action:'edit'})).status,409);
+    state.user='bob';await setProfile('محمد');
+    assert.equal((await post({action:'react',ideaId:draft.id,liked:false})).status,409);
+    state.user='alice';
+    assert.equal((await post(newIdea({challengeId:'week-2026-10-07'}))).status,200);
+    assert.equal((await read()).weekly.ownEntries,1);
+    assert.equal((await read('week=week-2026-09-30')).weekly.leaders[0].likes,1);
   });
 
   test('search treats wildcard input literally and matches authors',async()=>{

@@ -17,11 +17,13 @@
   "vars": {
     "SUPABASE_URL": "https://zsdfbigxaqaehqmxhaqe.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_Knws9CPdj4pb6Q-keZaltw_W1VhIhl0",
-    "TURNSTILE_SITE_KEY": "0x4AAAAAAE_Q2fd64aTYykc5"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAE_Q2fd64aTYykc5",
+    "WEEKLY_EMAIL_ENABLED": "true",
+    "WEEKLY_EMAIL_FROM": "ابتكر <hello@auth.ibtkr.space>"
   },
   "triggers": {
     "crons": [
-      "0 21 * * TUE"
+      "*/5 * * * *"
     ]
   }
 }

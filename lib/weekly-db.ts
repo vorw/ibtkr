@@ -9,8 +9,12 @@ export const scoresSQL = `SELECT i.user_id,COALESCE(p.display_name,MAX(i.name)) 
 
 export async function finalizeClosedWeeks(db: D1Database, now = new Date()) {
   const time=now.toISOString();
-  for (const week of weeklyChallenges.filter(week => week.endsAt<=time)) {
-    if (await db.prepare('SELECT challenge_id FROM finalized_weeks WHERE challenge_id=?').bind(week.id).first()) continue;
+  const closed = weeklyChallenges.filter(week => week.endsAt<=time);
+  if (!closed.length) return;
+  const finalized = new Set((await db.prepare(`SELECT challenge_id FROM finalized_weeks WHERE challenge_id IN (${closed.map(()=>'?').join(',')})`)
+    .bind(...closed.map(week=>week.id)).all<{challenge_id:string}>()).results.map(row=>row.challenge_id));
+  for (const week of closed) {
+    if (finalized.has(week.id)) continue;
     // One atomic batch, repeat-safe even if the cron and a visitor run together.
     await db.batch([
       db.prepare(`INSERT OR IGNORE INTO weekly_results (challenge_id,user_id,name,likes,entries,rank,finalized_at)

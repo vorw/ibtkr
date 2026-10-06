@@ -1,3 +1,4 @@
+import { preparedChallenges } from './weekly-content';
 export type Angle = { id: string; label: string; prompt: string; hint: string; icon: 'shuffle' | 'flip' | 'people' };
 export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[] };
 
@@ -36,7 +37,18 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     { id: 'reverse', label: 'اقلب الفكرة', icon: 'flip', prompt: 'تخيّل نشاطًا يخلي القادم وحده ينسحب. حدّد ثلاثة أسباب، واعكسها إلى نشاط يختار فيه مستوى مشاركته براحة.', hint: 'فكّر في الاختيار، والضغط الاجتماعي، والوقت قبل أول تفاعل.' },
     { id: 'what-if', label: 'ماذا لو؟', icon: 'people', prompt: 'ماذا لو بعض الحضور يفضلون المشاركة بدون كلام، ويصلون في أوقات مختلفة؟ كيف يبقى نشاطك مفهومًا ومفتوحًا لهم؟', hint: 'اختبر الحل مع شخص وصل متأخرًا وآخر ما يبي يبدأ محادثة.' },
   ],
-}];
+}, ...preparedChallenges.map((content,index):WeeklyChallenge => {
+  const start = Date.parse('2026-10-20T21:00:00.000Z') + index * 7 * 86400000;
+  const localDate = new Date(start + 3 * 3600000).toISOString().slice(0,10);
+  const types: Pick<Angle,'id'|'label'|'icon'>[] = [
+    {id:'change',label:'غيّر القاعدة',icon:'shuffle'},
+    {id:'reverse',label:'اقلب الفكرة',icon:'flip'},
+    {id:'what-if',label:'ماذا لو؟',icon:'people'},
+  ];
+  return {...content,id:'week-'+localDate,number:String(index+4).padStart(2,'0'),
+    startsAt:new Date(start).toISOString(),endsAt:new Date(start+7*86400000).toISOString(),
+    angles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
+})];
 
 export function currentChallenge(now = new Date()): WeeklyChallenge | null {
   const time = now.toISOString();
@@ -54,7 +66,8 @@ export function validateSchedule() {
   const ids = new Set<string>();
   for (let index=0; index<ordered.length; index++) {
     const week = ordered[index];
-    if (ids.has(week.id) || !/^week-\d{4}-\d{2}-\d{2}$/.test(week.id) || new Date(week.startsAt).toISOString() !== week.startsAt || new Date(week.endsAt).toISOString() !== week.endsAt || week.startsAt >= week.endsAt || week.angles.length !== 3 || new Set(week.angles.map(angle => angle.id)).size !== 3 || (index && ordered[index-1].endsAt > week.startsAt)) throw new Error('Invalid weekly challenge schedule');
+    const start = new Date(week.startsAt), end = new Date(week.endsAt);
+    if (ids.has(week.id) || !/^week-\d{4}-\d{2}-\d{2}$/.test(week.id) || start.toISOString() !== week.startsAt || end.toISOString() !== week.endsAt || end.getTime()-start.getTime() !== 7*86400000 || start.getUTCDay()!==2 || start.getUTCHours()!==21 || start.getUTCMinutes()!==0 || week.angles.length !== 3 || new Set(week.angles.map(angle => angle.id)).size !== 3 || week.angles.some(angle=>!angle.prompt.trim()||!angle.hint.trim()) || (index && ordered[index-1].endsAt !== week.startsAt)) throw new Error('Invalid weekly challenge schedule');
     ids.add(week.id);
   }
 }

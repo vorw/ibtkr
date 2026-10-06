@@ -1,5 +1,5 @@
 export type Page = 'home' | 'ideas' | 'leaderboard' | 'profile';
-export type Resume = { view: Page; compose?: string; idea?: string; edit?: string;angle?:string };
+export type Resume = { view: Page; compose?: string; idea?: string; edit?: string;angle?:string;week?:string };
 const pages: Page[] = ['home', 'ideas', 'leaderboard', 'profile'];
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -9,9 +9,11 @@ export function readResume(search: string): Resume {
   const idea = params.get('idea');
   const edit = params.get('edit');
   const compose = params.get('compose');
+  const week = params.get('week');
   return {
     ...(['change','reverse','what-if'].includes(params.get('angle')??'')?{angle:params.get('angle')!}:{}),
     view: pages.includes(view) ? view : 'home',
+    ...(week && /^week-\d{4}-\d{2}-\d{2}$/.test(week) ? { week } : {}),
     ...(idea && uuid.test(idea) ? { idea } : {}),
     ...(edit && uuid.test(edit) ? { edit } : {}),
     ...(compose && /^week-\d{4}-\d{2}-\d{2}$/.test(compose) ? { compose } : {}),
@@ -20,6 +22,7 @@ export function readResume(search: string): Resume {
 
 export function signInHref(resume: Resume): string {
   const params = new URLSearchParams({ view: resume.view });
+  if(resume.week)params.set('week',resume.week);
   if(resume.angle)params.set('angle',resume.angle);
   if (resume.compose) params.set('compose', resume.compose);
   if (resume.idea) params.set('idea', resume.idea);
