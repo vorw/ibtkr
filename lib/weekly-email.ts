@@ -3,9 +3,9 @@ import { weeklyChallenges, findWeek } from './weekly';
 import { ensureWeeklyEmailSchema } from './weekly-email-schema';
 import { renderWeeklyEmail, type WeeklyEmailResult } from './weekly-email-template';
 
-// First official close: October 14, 00:00 Riyadh. Retain the test-send ledger
+// First official close: October 10, 00:00 Riyadh. Retain the test-send ledger
 // for duplicate protection, but never backfill or retry the retired test round.
-export const WEEKLY_EMAIL_START = '2026-10-13T21:00:00.000Z';
+export const WEEKLY_EMAIL_START = weeklyChallenges[0].endsAt;
 const RETRY_WINDOW = 22 * 60 * 60 * 1000;
 const BATCH_SIZE = 5;
 type Payload = { from: string; to: string[]; subject: string; html: string; text: string };

@@ -2,16 +2,17 @@ import { preparedChallenges } from './weekly-content';
 export type Angle = { id: string; label: string; prompt: string; hint: string; icon: 'shuffle' | 'flip' | 'people' };
 export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[] };
 
-// Publish reviewed content here before its start. Dates are UTC; Wednesday
-// 00:00 in Riyadh is Tuesday 21:00 UTC. Never recycle IDs or overwrite past weeks.
-// The September 30 round was testing. Launch begins October 7; date-based
-// identifiers stay stable, while public numbering starts at 01.
+// Publish reviewed content here before its start. Saturday 00:00 Riyadh is
+// Friday 21:00 UTC: Friday remains open through 23:59:59.999 local time.
+// Week 01 retains its October 7 launch and closes October 10; later weeks
+// run Saturday to Saturday. Existing identifiers stay stable for entries,
+// archives, drafts and email deduplication; they are not the new start dates.
 export const weeklyChallenges: WeeklyChallenge[] = [{
   id: 'week-2026-10-07', number: '01', category: 'التجارب الرقمية',
   title: 'إلغاء الاشتراك… بدون دوّامة.',
   short: 'المستخدم يبي يوقف الاشتراك، والخدمة تبي تعرف السبب. كيف توازن بينهم؟',
   description: 'شخص قرّر يوقف اشتراكه في خدمة رقمية. الشركة تبي تفهم السبب وتحافظ على علاقتها معه، لكن كثرة الخطوات تزعجه. صمّم تجربة تحترم قراره وتفيد الشركة، بدون إجباره يتواصل مع الدعم.',
-  startsAt: '2026-10-06T21:00:00.000Z', endsAt: '2026-10-13T21:00:00.000Z',
+  startsAt: '2026-10-06T21:00:00.000Z', endsAt: '2026-10-09T21:00:00.000Z',
   angles: [
     { id: 'change', label: 'غيّر القاعدة', icon: 'shuffle', prompt: 'كيف تخلي الإلغاء بخطوة واضحة، وفي نفس الوقت تعطي المستخدم خيارًا مفيدًا إذا كان سبب إلغائه مؤقتًا؟ بدون ما تخفي زر الإلغاء.', hint: 'فكّر في ترتيب الخيارات، وفي الشيء اللي يحتاج يعرفه قبل التأكيد.' },
     { id: 'reverse', label: 'اقلب الفكرة', icon: 'flip', prompt: 'صمّم أسوأ تجربة إلغاء: اختر ثلاثة أشياء تعرقل المستخدم، ثم اعكس كل واحد إلى جزء عملي من تجربة أفضل.', hint: 'لا تكتفي بحذف الإزعاج؛ وضّح كيف يشتغل البديل وماذا يراه المستخدم.' },
@@ -22,15 +23,16 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
   title: 'جاي لحالك؟ مكانك موجود.',
   short: 'كيف تتحول أول خمس دقائق من إحراج إلى مشاركة مريحة؟',
   description: 'شخص وصل لفعالية جامعية لحاله، والموجودون يعرفون بعض. ابتكر تجربة بسيطة تساعده يشارك براحة، بدون تعريف بنفسه أمام الجميع، وبدون ميزانية إضافية.',
-  startsAt: '2026-10-13T21:00:00.000Z', endsAt: '2026-10-20T21:00:00.000Z',
+  startsAt: '2026-10-09T21:00:00.000Z', endsAt: '2026-10-16T21:00:00.000Z',
   angles: [
     { id: 'change', label: 'غيّر القاعدة', icon: 'shuffle', prompt: 'غيّر طريقة بدء النشاط بحيث ما يحتاج أحد يدور على مجموعة بنفسه. كيف يشارك القادم وحده بدون ما يشعر أنه حالة خاصة؟', hint: 'صمّم خطوة واحدة تمرّ على الجميع، مو حلًّا يلفت النظر للشخص وحده.' },
     { id: 'reverse', label: 'اقلب الفكرة', icon: 'flip', prompt: 'تخيّل نشاطًا يخلي القادم وحده ينسحب. حدّد ثلاثة أسباب، واعكسها إلى نشاط يختار فيه مستوى مشاركته براحة.', hint: 'فكّر في الاختيار، والضغط الاجتماعي، والوقت قبل أول تفاعل.' },
     { id: 'what-if', label: 'ماذا لو؟', icon: 'people', prompt: 'ماذا لو بعض الحضور يفضلون المشاركة بدون كلام، ويصلون في أوقات مختلفة؟ كيف يبقى نشاطك مفهومًا ومفتوحًا لهم؟', hint: 'اختبر الحل مع شخص وصل متأخرًا وآخر ما يبي يبدأ محادثة.' },
   ],
 }, ...preparedChallenges.map((content,index):WeeklyChallenge => {
-  const start = Date.parse('2026-10-20T21:00:00.000Z') + index * 7 * 86400000;
-  const localDate = new Date(start + 3 * 3600000).toISOString().slice(0,10);
+  const start = Date.parse('2026-10-16T21:00:00.000Z') + index * 7 * 86400000;
+  // Keep the original Wednesday ID, even though the new start is Saturday.
+  const localDate = new Date(start + 4 * 86400000 + 3 * 3600000).toISOString().slice(0,10);
   const types: Pick<Angle,'id'|'label'|'icon'>[] = [
     {id:'change',label:'غيّر القاعدة',icon:'shuffle'},
     {id:'reverse',label:'اقلب الفكرة',icon:'flip'},
@@ -58,7 +60,17 @@ export function validateSchedule() {
   for (let index=0; index<ordered.length; index++) {
     const week = ordered[index];
     const start = new Date(week.startsAt), end = new Date(week.endsAt);
-    if (ids.has(week.id) || !/^week-\d{4}-\d{2}-\d{2}$/.test(week.id) || start.toISOString() !== week.startsAt || end.toISOString() !== week.endsAt || end.getTime()-start.getTime() !== 7*86400000 || start.getUTCDay()!==2 || start.getUTCHours()!==21 || start.getUTCMinutes()!==0 || week.angles.length !== 3 || new Set(week.angles.map(angle => angle.id)).size !== 3 || week.angles.some(angle=>!angle.prompt.trim()||!angle.hint.trim()) || (index && ordered[index-1].endsAt !== week.startsAt)) throw new Error('Invalid weekly challenge schedule');
+    const launchTransition = index === 0 && week.id === 'week-2026-10-07'
+      && week.startsAt === '2026-10-06T21:00:00.000Z' && week.endsAt === '2026-10-09T21:00:00.000Z';
+    const midnightRiyadh = (date: Date) => date.getUTCHours() === 21 && date.getUTCMinutes() === 0
+      && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+    if (ids.has(week.id) || !/^week-\d{4}-\d{2}-\d{2}$/.test(week.id)
+      || start.toISOString() !== week.startsAt || end.toISOString() !== week.endsAt
+      || !midnightRiyadh(start) || !midnightRiyadh(end) || end.getUTCDay() !== 5
+      || (!launchTransition && (end.getTime()-start.getTime() !== 7*86400000 || start.getUTCDay() !== 5))
+      || week.angles.length !== 3 || new Set(week.angles.map(angle => angle.id)).size !== 3
+      || week.angles.some(angle=>!angle.prompt.trim()||!angle.hint.trim())
+      || (index && ordered[index-1].endsAt !== week.startsAt)) throw new Error('Invalid weekly challenge schedule');
     ids.add(week.id);
   }
 }

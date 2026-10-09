@@ -59,7 +59,7 @@ async function setProfile(displayName) {
 
 describe('Community operations against the real route and SQLite schema', () => {
   beforeEach(async () => {
-    mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-12T12:00:00.000Z') });
+    mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-08T12:00:00.000Z') });
     resetDatabase();
     const result = await setProfile('أحمد');
     assert.equal(result.status, 200);
@@ -141,7 +141,7 @@ describe('Community operations against the real route and SQLite schema', () => 
   test('legacy cleanup preserves new weekly entries, likes, comments, results and profiles across concurrent instances',async()=>{
     resetDatabase();
     const {ensureWeeklySchema}=await import('../lib/weekly-schema.ts');const {database}=await import('./community-fixture.mjs');
-    const created='2026-10-12T12:00:00.000Z';
+    const created='2026-10-08T12:00:00.000Z';
     state.db.prepare('INSERT INTO profiles VALUES (?,?,?,?,?)').run('alice','أحمد','احمد',created,created);
     const old=randomUUID(),weekly=randomUUID();
     for(const [id,challenge,angle] of [[old,'queue',null],[weekly,'week-2026-10-07','change']]) {
@@ -463,7 +463,7 @@ describe('Community operations against the real route and SQLite schema', () => 
 
   test('database cutoff also blocks writes that started before the deadline',async()=>{
     const draft=newIdea();await post(draft);
-    state.databaseNow='2026-10-13T21:00:00.000Z';
+    state.databaseNow='2026-10-09T21:00:00.000Z';
     assert.equal((await post(newIdea())).status,409);
     assert.equal((await post({...draft,action:'edit'})).status,409);
     state.user='bob';await setProfile('محمد');
@@ -486,36 +486,47 @@ describe('Community operations against the real route and SQLite schema', () => 
     assert.equal((await read('week=legacy')).ideas[0].id,id);assert.equal((await read()).ideas.length,0);
   });
 
-  test('Tuesday midnight cutoff rejects new entries, edits and all vote changes',async()=>{
-    const {weeklyChallenges}=await import('../lib/weekly.ts');const week=weeklyChallenges[0];const savedEnd=week.endsAt;
-    const draft=newIdea();await post(draft);
-    try{
-      week.endsAt=new Date(Date.now()-1000).toISOString();
-      assert.equal((await post(newIdea())).status,409);
-      assert.equal((await post({...draft,action:'edit'})).status,409);
-      state.user='bob';await setProfile('محمد');
-      assert.equal((await post({action:'react',ideaId:draft.id,liked:true})).status,409);
-      assert.equal((await post({action:'react',ideaId:draft.id,liked:false})).status,409);
-      const data=await read();assert.equal(data.weekly.current,null);assert.equal(data.weekly.finalized,true);
-      assert.equal(state.db.prepare('SELECT COUNT(*) n FROM reactions').get().n,0);
-    }finally{week.endsAt=savedEnd;}
+  test('Saturday midnight cutoff rejects new entries, edits and all vote changes',async()=>{
+    const {weeklyChallenges}=await import('../lib/weekly.ts');const week=weeklyChallenges[0];
+    mock.timers.setTime(Date.parse(week.endsAt)-1);state.databaseNow=new Date(Date.now()).toISOString();
+    const draft=newIdea();assert.equal((await post(draft)).status,200);
+    assert.equal((await post({...draft,action:'edit'})).status,200);
+    state.user='bob';await setProfile('محمد');
+    assert.equal((await post({action:'react',ideaId:draft.id,liked:true})).status,200);
+    mock.timers.setTime(Date.parse(week.endsAt));state.databaseNow=week.endsAt;
+    state.user='alice';
+    assert.equal((await post(newIdea())).status,409);
+    assert.equal((await post({...draft,action:'edit'})).status,409);
+    state.user='bob';
+    assert.equal((await post({action:'react',ideaId:draft.id,liked:true})).status,409);
+    assert.equal((await post({action:'react',ideaId:draft.id,liked:false})).status,409);
+    const data=await read('week='+week.id);
+    assert.equal(data.weekly.current.id,weeklyChallenges[1].id);assert.equal(data.weekly.finalized,true);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM reactions WHERE liked=1').get().n,1);
   });
 
-  test('date boundaries are Wednesday 00:00 Riyadh and next published week replaces the old one',async()=>{
+  test('date boundaries are Saturday 00:00 Riyadh and next published week replaces the old one',async()=>{
     const {currentChallenge,weeklyChallenges,challengeStatus}=await import('../lib/weekly.ts');const first=weeklyChallenges[0];
-    assert.equal(currentChallenge(new Date('2026-10-13T20:59:59.999Z')).id,first.id);
-    assert.equal(currentChallenge(new Date('2026-10-13T21:00:00.000Z')).id,'week-2026-10-14');
+    assert.equal(currentChallenge(new Date('2026-10-09T20:59:59.999Z')).id,first.id);
+    assert.equal(currentChallenge(new Date('2026-10-09T21:00:00.000Z')).id,'week-2026-10-14');
     assert.equal(challengeStatus(first,new Date(first.endsAt)),'closed');
   });
 
   test('twenty official launch weeks are contiguous and each boundary selects exactly its next challenge',async()=>{
     const {currentChallenge,weeklyChallenges,validateSchedule}=await import('../lib/weekly.ts');
     validateSchedule();assert.equal(weeklyChallenges.length,20);
-    assert.equal(weeklyChallenges[1].startsAt,'2026-10-13T21:00:00.000Z');
-    assert.equal(weeklyChallenges.at(-1).endsAt,'2027-02-23T21:00:00.000Z');
+    assert.equal(weeklyChallenges[1].startsAt,'2026-10-09T21:00:00.000Z');
+    assert.equal(weeklyChallenges.at(-1).endsAt,'2027-02-19T21:00:00.000Z');
     const titles=new Set(),prompts=new Set();
     for(let i=0;i<weeklyChallenges.length;i++){
-      const week=weeklyChallenges[i];titles.add(week.title);assert.equal(week.number,String(i+1).padStart(2,'0'));
+      const week=weeklyChallenges[i];
+      const end=new Date(week.endsAt),start=new Date(week.startsAt);
+      assert.equal(end.getUTCDay(),5);assert.equal(end.getUTCHours(),21);
+      assert.equal(end.getTime()-start.getTime(),(i===0?3:7)*86400000);
+      if(i)assert.equal(start.getUTCDay(),5);
+      // Old IDs remain valid, even though their start dates have moved.
+      assert.equal(week.id,'week-'+new Date(Date.parse('2026-10-06T21:00:00.000Z')+i*7*86400000+3*3600000).toISOString().slice(0,10));
+      titles.add(week.title);assert.equal(week.number,String(i+1).padStart(2,'0'));
       assert.equal(currentChallenge(new Date(week.startsAt))?.id,week.id);
       assert.equal(currentChallenge(new Date(Date.parse(week.endsAt)-1))?.id,week.id);
       assert.equal(currentChallenge(new Date(week.endsAt))?.id,weeklyChallenges[i+1]?.id);
@@ -523,14 +534,14 @@ describe('Community operations against the real route and SQLite schema', () => 
       for(const angle of week.angles){prompts.add(angle.prompt);assert.ok(angle.hint.length>20);}
     }
     assert.equal(titles.size,20);assert.equal(prompts.size,60);
-    assert.equal(currentChallenge(new Date('2027-02-23T21:00:00.000Z')),null);
+    assert.equal(currentChallenge(new Date('2027-02-19T21:00:00.000Z')),null);
   });
 
   test('rollover freezes the old score, starts a clean current leaderboard and retains archives and lifetime XP',async()=>{
     const draft=newIdea();assert.equal((await post(draft)).status,200);
     state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(draft.id,'bob',1);
-    mock.timers.tick(Date.parse('2026-10-13T21:00:00.000Z')-Date.now());
-    state.databaseNow='2026-10-13T21:00:00.000Z';
+    mock.timers.tick(Date.parse('2026-10-09T21:00:00.000Z')-Date.now());
+    state.databaseNow='2026-10-09T21:00:00.000Z';
     const current=await read();
     assert.equal(current.weekly.current.id,'week-2026-10-14');
     assert.equal(current.weekly.current.number,'02');

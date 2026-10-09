@@ -12,16 +12,16 @@
 
 ## Schedule
 
-The close is Tuesday 11:59 PM Riyadh. Technically the end boundary is exclusive Wednesday 00:00 Riyadh / Tuesday 21:00 UTC. The next scheduled week becomes active at that boundary. The Worker cron at `*/5 * * * *` includes that exact close, finalizes completed weeks and processes weekly congratulations; API reads provide an idempotent finalization fallback if a cron is delayed. See [weekly emails](weekly-emails.md) for activation, delivery rules and recovery.
+The close is Friday 11:59 PM Riyadh. Technically the end boundary is exclusive Saturday 00:00 Riyadh / Friday 21:00 UTC. The next scheduled week becomes active at that boundary. The Worker cron at `*/5 * * * *` includes that exact close, finalizes completed weeks and processes weekly congratulations; API reads provide an idempotent finalization fallback if a cron is delayed. See [weekly emails](weekly-emails.md) for activation, delivery rules and recovery.
 
-The official launch schedule starts at **week 01** and includes **20 weeks**, from 7 October 2026 through the final close on 24 February 2027 (Riyadh time). Each has three distinct prompts and hints. The original two upcoming challenges are retained and 18 more are defined in `lib/weekly-content.ts`.
+The official launch schedule starts at **week 01** and includes **20 weeks**, from 7 October 2026 through the final close on 20 February 2027 (Riyadh time). Each has three distinct prompts and hints. The original two upcoming challenges are retained and 18 more are defined in `lib/weekly-content.ts`.
 
 | Challenge | Riyadh start | Riyadh end (exclusive) |
 | --- | --- | --- |
-| Clear subscription cancellation | 7 October 2026, 00:00 | 14 October 2026, 00:00 |
-| Arriving alone at an event | 14 October 2026, 00:00 | 21 October 2026, 00:00 |
+| Clear subscription cancellation | 7 October 2026, 00:00 | 10 October 2026, 00:00 |
+| Arriving alone at an event | 10 October 2026, 00:00 | 17 October 2026, 00:00 |
 
-`lib/weekly.ts` combines the existing weeks and prepared content into a validated contiguous schedule. Add reviewed future problems before their start; never recycle identifiers or alter past weeks. Each problem must have three unique angle IDs and a seven-day interval beginning Wednesday midnight Riyadh. If this finite batch runs out, the home shows a waiting state and past results remain available. It does not reuse a closed problem.
+`lib/weekly.ts` combines the existing weeks and prepared content into a validated contiguous schedule. Add reviewed future problems before their start; never recycle identifiers or alter past weeks. Each problem must have three unique angle IDs and a seven-day interval beginning Saturday midnight Riyadh. Week 01 is the sole transition exception: its original 7 October start is preserved and it closes on 10 October. Existing date-based IDs stay unchanged to preserve entries, archives, drafts and email deduplication; they no longer identify the actual start date. If this finite batch runs out, the home shows a waiting state and past results remain available. It does not reuse a closed problem.
 
 At the deadline, an already-open homepage refreshes against the server clock and shows a dismissible notice linking to the closed week's results. The new problem appears with no angle selected. An open composer for the closed week is dismissed, and its local draft stays attached to that week rather than being submitted to the new challenge. Requests made after the deadline are rejected by the server. Each week starts with its own participation and likes; accounts, official archived entries and lifetime XP remain intact. The next week does not wait for email delivery. Frozen eligible results enter the email outbox and the five-minute scheduled job sends the approved individual congratulations with repeat protection.
 
@@ -64,4 +64,4 @@ The weekly release was verified on the live homepage, three-angle switching, cha
 
 ## Official launch reset — 7 October 2026
 
-The September 30 round was testing. Migration 0005 moves its ideas, comments, likes, rankings and finalization record into private `launch_test_archive_*` tables in a guarded atomic batch, then clears that round from active tables. Its activity no longer earns XP or appears in public archives. Profiles and authentication stay intact, and October 7 activity is preserved. The twenty existing prepared challenges keep their date IDs and boundaries but are numbered 01–20. Test drafts are cleared; official drafts and login sessions are retained. Sent test email receipts are kept, with no replay. Official congratulations start at the first real close, 14 October 2026 at 00:00 Riyadh.
+The September 30 round was testing. Migration 0005 moves its ideas, comments, likes, rankings and finalization record into private `launch_test_archive_*` tables in a guarded atomic batch, then clears that round from active tables. Its activity no longer earns XP or appears in public archives. Profiles and authentication stay intact, and October 7 activity is preserved. The twenty existing prepared challenges keep their date IDs and are numbered 01–20. Test drafts are cleared; official drafts and login sessions are retained. Sent test email receipts are kept, with no replay. Official congratulations start at the first real close, 10 October 2026 at 00:00 Riyadh.

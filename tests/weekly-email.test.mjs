@@ -14,7 +14,7 @@ registerHooks({ resolve(s,c,next) {
 }});
 const { ensureWeeklySchema }=await import('../lib/weekly-schema.ts');
 const { ensureWeeklyEmailSchema }=await import('../lib/weekly-email-schema.ts');
-const { enqueueWeeklyEmails,processWeeklyEmails,createWeeklyMailer,WeeklyEmailError,runWeeklyEmailJob }=await import('../lib/weekly-email.ts');
+const { enqueueWeeklyEmails,processWeeklyEmails,createWeeklyMailer,WeeklyEmailError,runWeeklyEmailJob,WEEKLY_EMAIL_START }=await import('../lib/weekly-email.ts');
 const { renderWeeklyEmail }=await import('../lib/weekly-email-template.ts');
 const { weeklyChallenges }=await import('../lib/weekly.ts');
 const { finalizeClosedWeeks }=await import('../lib/weekly-db.ts');
@@ -46,7 +46,8 @@ test('test sends remain recorded, retired retries are skipped, and official mail
   assert.equal(m.calls.length,0);
   const sent=deliveries().find(x=>x.user_id==='test-sent');assert.equal(sent.status,'sent');assert.equal(sent.provider_id,'original-provider-id');
   const pending=deliveries().find(x=>x.user_id==='test-pending');assert.equal(pending.status,'skipped');assert.equal(pending.last_error_code,'test_round_retired');
-  frozen('real-winner',1,5);await enqueueWeeklyEmails(db,later(-1));assert.equal(deliveries().length,2);
+  assert.equal(WEEKLY_EMAIL_START,'2026-10-09T21:00:00.000Z');
+  frozen('real-winner',1,5);await enqueueWeeklyEmails(db,new Date(closed.getTime()-1));assert.equal(deliveries().length,2);
   await enqueueWeeklyEmails(db,closed);await processWeeklyEmails(db,m,closed);
   assert.equal(m.calls.length,1);assert.ok(m.calls[0].payload.text.includes('تحدّي الأسبوع 01'));
   assert.ok(m.calls[0].key.includes('week-2026-10-07'));assert.equal(deliveries().length,3);
@@ -63,13 +64,16 @@ test('only frozen positive-like top-three ranks are queued, including ties, once
 });
 
 test('finalization precedes mail and uses the sum of likes across angles',async()=>{
-  const created='2026-10-12T12:00:00.000Z';
+  const created='2026-10-08T12:00:00.000Z';
   state.db.prepare('INSERT INTO profiles VALUES (?,?,?,?,?)').run('alice','أحمد','احمد',created,created);
   for(const [id,angle] of [['entry-a','change'],['entry-b','reverse']]){
     state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(id,'alice',week.id,'أحمد','عنوان الفكرة','شرح الفكرة المقترحة.',created,angle);
     state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(id,'bob',1);
     state.db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(id,'alice',1);
   }
+  await finalizeClosedWeeks(db,new Date(closed.getTime()-1));
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM finalized_weeks').get().n,0);
+  await enqueueWeeklyEmails(db,new Date(closed.getTime()-1));assert.equal(deliveries().length,0);
   await finalizeClosedWeeks(db,closed);await enqueueWeeklyEmails(db,closed);
   assert.equal(deliveries()[0].likes,2);assert.equal(deliveries()[0].entries,2);
   const m=mailer();await processWeeklyEmails(db,m,closed);assert.match(m.calls[0].payload.text,/٢ إعجاب/);
@@ -148,7 +152,7 @@ test('approved design fills real data, escapes HTML and keeps the weekly archive
     const e=renderWeeklyEmail(week,{user_id:'alice',name:'<img src=x onerror=evil()>',rank,likes:42,entries:1});
     assert.ok(!e.html.includes('<img'));assert.ok(e.html.includes('&lt;img'));assert.ok(!e.html.includes('{{'));
     assert.ok(e.html.includes('FTC / IBTKR'));assert.ok(e.html.includes('>0'+rank+'</div>'));assert.ok(e.html.includes('href="https://ibtkr.space/?view=leaderboard&amp;week='+week.id+'"'));
-    assert.ok(e.text.includes('١٣ أكتوبر ٢٠٢٦'));assert.ok(e.text.includes('٤٢ إعجاب'));
+    assert.ok(e.text.includes('٧ أكتوبر ٢٠٢٦ — ٩ أكتوبر ٢٠٢٦'));assert.ok(!e.text.includes('١٣ أكتوبر ٢٠٢٦'));assert.ok(e.text.includes('٤٢ إعجاب'));
     if(rank!==1)assert.ok(!e.subject.includes('مبتكر الأسبوع'));
   }
   assert.throws(()=>renderWeeklyEmail(week,{name:'أحمد',rank:4,likes:10}));
