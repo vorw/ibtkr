@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 
-export const state = { user: null, db: null, failReads: false, failReadAfterWrite: false, databaseNow: '2026-10-08T12:00:00.000Z' };
+export const state = { user: null, db: null, failReads: false, failReadAfterWrite: false, databaseNow: '2026-10-15T12:00:00.000Z' };
 export function resetDatabase({ weekly = true, opened = true } = {}) {
   state.db?.close();
   state.db = new DatabaseSync(':memory:');
@@ -14,7 +14,7 @@ export function resetDatabase({ weekly = true, opened = true } = {}) {
     state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-07',15,'2026-10-06T21:00:00.000Z');
     for(const user of Array.from({length:15},(_,i)=>'fixture-opener-'+i))state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-07',user,'2026-10-06T21:00:00.000Z');
   }
-  state.databaseNow = '2026-10-08T12:00:00.000Z';
+  state.databaseNow = '2026-10-15T12:00:00.000Z';
   state.db.function('test_now', () => state.databaseNow);
   state.user = 'alice'; state.failReads = false; state.failReadAfterWrite = false;
 }

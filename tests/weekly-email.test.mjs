@@ -46,11 +46,11 @@ test('test sends remain recorded, retired retries are skipped, and official mail
   assert.equal(m.calls.length,0);
   const sent=deliveries().find(x=>x.user_id==='test-sent');assert.equal(sent.status,'sent');assert.equal(sent.provider_id,'original-provider-id');
   const pending=deliveries().find(x=>x.user_id==='test-pending');assert.equal(pending.status,'skipped');assert.equal(pending.last_error_code,'test_round_retired');
-  assert.equal(WEEKLY_EMAIL_START,'2026-10-09T21:00:00.000Z');
+  assert.equal(WEEKLY_EMAIL_START,'2026-10-16T21:00:00.000Z');
   frozen('real-winner',1,5);await enqueueWeeklyEmails(db,new Date(closed.getTime()-1));assert.equal(deliveries().length,2);
   await enqueueWeeklyEmails(db,closed);await processWeeklyEmails(db,m,closed);
   assert.equal(m.calls.length,1);assert.ok(m.calls[0].payload.text.includes('تحدّي الأسبوع 01'));
-  assert.ok(m.calls[0].key.includes('week-2026-10-07'));assert.equal(deliveries().length,3);
+  assert.ok(m.calls[0].key.includes('week-2026-10-14'));assert.equal(deliveries().length,3);
   await enqueueWeeklyEmails(db,later(5));await processWeeklyEmails(db,m,later(5));assert.equal(m.calls.length,1);
 });
 
@@ -64,7 +64,7 @@ test('only frozen positive-like top-three ranks are queued, including ties, once
 });
 
 test('finalization precedes mail and uses the sum of likes across angles',async()=>{
-  const created='2026-10-08T12:00:00.000Z';
+  const created='2026-10-15T12:00:00.000Z';
   state.db.prepare('INSERT INTO profiles VALUES (?,?,?,?,?)').run('alice','أحمد','احمد',created,created);
   for(const [id,angle] of [['entry-a','change'],['entry-b','reverse']]){
     state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(id,'alice',week.id,'أحمد','عنوان الفكرة','شرح الفكرة المقترحة.',created,angle);
@@ -152,7 +152,7 @@ test('approved design fills real data, escapes HTML and keeps the weekly archive
     const e=renderWeeklyEmail(week,{user_id:'alice',name:'<img src=x onerror=evil()>',rank,likes:42,entries:1});
     assert.ok(!e.html.includes('<img'));assert.ok(e.html.includes('&lt;img'));assert.ok(!e.html.includes('{{'));
     assert.ok(e.html.includes('FTC / IBTKR'));assert.ok(e.html.includes('>0'+rank+'</div>'));assert.ok(e.html.includes('href="https://ibtkr.space/?view=leaderboard&amp;week='+week.id+'"'));
-    assert.ok(e.text.includes('٧ أكتوبر ٢٠٢٦ — ٩ أكتوبر ٢٠٢٦'));assert.ok(!e.text.includes('١٣ أكتوبر ٢٠٢٦'));assert.ok(e.text.includes('٤٢ إعجاب'));
+    assert.ok(e.text.includes('١٠ أكتوبر ٢٠٢٦ — ١٦ أكتوبر ٢٠٢٦'));assert.ok(!e.text.includes('١٣ أكتوبر ٢٠٢٦'));assert.ok(e.text.includes('٤٢ إعجاب'));
     if(rank!==1)assert.ok(!e.subject.includes('مبتكر الأسبوع'));
   }
   assert.throws(()=>renderWeeklyEmail(week,{name:'أحمد',rank:4,likes:10}));
@@ -187,4 +187,16 @@ test('disabled sending does nothing and absent keys leave final results and pend
   frozen('alice',1,10);await runWeeklyEmailJob({DB:db,WEEKLY_EMAIL_ENABLED:'false'},closed);assert.equal(deliveries().length,0);
   await assert.rejects(runWeeklyEmailJob({DB:db,WEEKLY_EMAIL_ENABLED:'true'},closed),/configuration_missing/);
   assert.equal(deliveries()[0].status,'pending');assert.equal(state.db.prepare('SELECT COUNT(*) n FROM weekly_results').get().n,1);
+});
+
+
+test('pre-opening October round is retired without sending or losing its sent email ledger',async()=>{
+  const old='week-2026-10-07',now=new Date(week.startsAt);
+  frozen('pre-opening-winner',1,2,'اختبار الافتتاح',old);
+  state.db.prepare(`INSERT INTO weekly_email_deliveries
+    (challenge_id,user_id,name,likes,entries,rank,status,next_attempt_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(old,'pre-opening-winner','اختبار الافتتاح',2,1,1,'pending',now.toISOString(),now.toISOString());
+  const m=mailer();await enqueueWeeklyEmails(db,now);await processWeeklyEmails(db,m,now);
+  assert.equal(m.calls.length,0);assert.equal(deliveries()[0].status,'skipped');
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM weekly_results WHERE challenge_id=?').get(old).n,1);
 });

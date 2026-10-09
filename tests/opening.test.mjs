@@ -16,7 +16,7 @@ const {readOpening,cutOpening,openingConfig,createOpeningVisitor,resolveOpeningV
 const {GET,POST}=await import('../app/api/opening/route.ts');
 const community=await import('../app/api/community/route.ts');
 const originalConfig={...openingConfig};
-beforeEach(()=>{Object.assign(openingConfig,originalConfig);resetDatabase({opened:false});mock.timers.enable({apis:['Date'],now:new Date('2026-10-07T12:00:00.000Z')});});
+beforeEach(()=>{Object.assign(openingConfig,originalConfig);resetDatabase({opened:false});mock.timers.enable({apis:['Date'],now:new Date('2026-10-14T12:00:00.000Z')});});
 afterEach(()=>{mock.timers.reset();Object.assign(openingConfig,originalConfig);});after(()=>state.db?.close());
 const request=(cookie,body={action:'cut'},headers={})=>new Request('https://ibtkr.space/api/opening',{method:'POST',headers:{Origin:'https://ibtkr.space','Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...headers},body:typeof body==='string'?body:JSON.stringify(body)});
 async function visit(cookie){
@@ -83,7 +83,7 @@ test('community stays closed through fourteen cuts then opens without changing w
   assert.equal((await read()).status,423);assert.equal((await write()).status,423);
   for(let i=0;i<14;i++)await cutOpening(db,ids[i]);assert.equal((await read()).status,423);
   await cutOpening(db,ids[14]);const opened=await read();assert.equal(opened.status,200);
-  const data=await opened.json();assert.equal(data.weekly.current.id,'week-2026-10-07');assert.equal(data.weekly.current.number,'01');
+  const data=await opened.json();assert.equal(data.weekly.current.id,'week-2026-10-14');assert.equal(data.weekly.current.number,'01');
   assert.equal((await write()).status,200);assert.deepEqual(data.progress,{ideas:0,reviews:0,xp:0});
 });
 test('a failed fifteenth-cut transaction rolls back both the count and opening and retries safely',async()=>{
@@ -121,7 +121,7 @@ test('the local preview shows the Saturday challenge to guests without opening t
   const preview=await community.GET(new Request('https://ibtkr.space/api/community?openingPreview=1'));
   assert.equal(preview.status,200);assert.equal(preview.headers.get('cache-control'),'private, no-store');
   const data=await preview.json();assert.equal(data.signedIn,false);assert.deepEqual(data.ideas,[]);
-  assert.equal(data.weekly.current.number,'02');assert.equal(data.weekly.current.startsAt,'2026-10-09T21:00:00.000Z');
+  assert.equal(data.weekly.current.number,'01');assert.equal(data.weekly.current.title,'إلغاء الاشتراك… بدون دوّامة.');assert.equal(data.weekly.current.endsAt,'2026-10-16T21:00:00.000Z');assert.equal(data.weekly.weeks.length,1);assert.equal(data.weekly.current.startsAt,'2026-10-09T21:00:00.000Z');
   assert.equal(JSON.stringify(data).includes('شرح فكرة محفوظة'),false);
   assert.deepEqual(await readOpening(db,null),before);
   assert.equal((await community.GET(new Request('https://ibtkr.space/api/community'))).status,423);
