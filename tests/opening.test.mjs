@@ -111,3 +111,33 @@ test('disabling the gate preserves visitor and cut records',async()=>{
   const db=database(),id=await createOpeningVisitor(db);await cutOpening(db,id);openingConfig.enabled=false;
   assert.equal((await readOpening(db,null)).isOpen,true);assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,1);
 });
+
+test('the local preview shows the Saturday challenge to guests without opening the event or exposing signed-in ideas',async()=>{
+  const db=database();await readOpening(db,null);
+  mock.timers.setTime(new Date('2026-10-09T21:30:00.000Z').getTime());
+  state.databaseNow=new Date().toISOString();state.user=null;
+  state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(crypto.randomUUID(),'alice','week-2026-10-14','أحمد','عنوان خاص','شرح فكرة محفوظة لا يقرأها الزائر.',new Date().toISOString(),'change');
+  const before=await readOpening(db,null);
+  const preview=await community.GET(new Request('https://ibtkr.space/api/community?openingPreview=1'));
+  assert.equal(preview.status,200);assert.equal(preview.headers.get('cache-control'),'private, no-store');
+  const data=await preview.json();assert.equal(data.signedIn,false);assert.deepEqual(data.ideas,[]);
+  assert.equal(data.weekly.current.number,'02');assert.equal(data.weekly.current.startsAt,'2026-10-09T21:00:00.000Z');
+  assert.equal(JSON.stringify(data).includes('شرح فكرة محفوظة'),false);
+  assert.deepEqual(await readOpening(db,null),before);
+  assert.equal((await community.GET(new Request('https://ibtkr.space/api/community'))).status,423);
+  for(const value of ['0','true','2'])assert.equal((await community.GET(new Request('https://ibtkr.space/api/community?openingPreview='+value))).status,423);
+});
+
+test('preview reads retain ordinary signed-in identity while every preview write is rejected even after public opening',async()=>{
+  const db=database();await readOpening(db,null);
+  const get=()=>community.GET(new Request('https://ibtkr.space/api/community?openingPreview=1'));
+  assert.equal((await (await get()).json()).signedIn,true);
+  const write=(query='')=>community.POST(new Request('https://ibtkr.space/api/community'+query,{method:'POST',headers:{Origin:'https://ibtkr.space','Content-Type':'application/json'},body:JSON.stringify({action:'profile',displayName:'أحمد'})}));
+  assert.equal((await write('?openingPreview=1')).status,403);
+  assert.equal((await write()).status,423);
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM profiles').get().n,0);
+  assert.equal((await readOpening(db,null)).count,0);
+  const ids=await visitors(db,15);for(const id of ids)await cutOpening(db,id);
+  assert.equal((await write('?openingPreview=1')).status,403);
+  assert.equal((await write()).status,200);
+});

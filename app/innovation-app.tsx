@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode, type PointerEvent } from 'react';
+import { SitePreviewContext } from './opening-gate';
+
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode, type PointerEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { ArrowLeft, ArrowUpLeft, Check, ChevronLeft, ChevronRight, Heart, Lightbulb, MessageCircle, Pencil, Plus, RotateCcw, Shuffle, Sparkles, Users, Trophy, Search, Clock3, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -87,11 +89,14 @@ function SignInNotice({ href, compact = false }: { href: string; compact?: boole
   </div>;
 }
 
-async function requestCommunity(body?: unknown, params = new URLSearchParams()) {
+async function requestCommunity(body?: unknown, params = new URLSearchParams(), openingPreview=false) {
+  if(openingPreview&&body!==undefined)throw new Error('هذه معاينة قبل الافتتاح. المشاركة والتصويت تفتح بعد اكتمال قصّ الشريط.');
+  const requestParams=new URLSearchParams(params);
+  if(openingPreview)requestParams.set('openingPreview','1');
   const authorization = await sessionHeaders();
   let response: Response;
   try {
-    response = await fetch('/api/community?' + params, {
+    response = await fetch('/api/community?' + requestParams, {
       method: body === undefined ? 'GET' : 'POST', cache: 'no-store',
       headers: { ...authorization, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -123,6 +128,7 @@ function PlayerPanel({ progress, compact = false, onProfile }: { progress: AppDa
 }
 
 export default function InnovationApp() {
+  const openingPreview=useContext(SitePreviewContext);
   const [tab, setTab] = useState<Page>('home');
   const [data, setData] = useState<AppData>(initial);
   const [loading, setLoading] = useState(true);
@@ -174,7 +180,7 @@ export default function InnovationApp() {
     if (mutationLock.current) return null;
     const version = ++refreshVersion.current;
     try {
-      const result = await requestCommunity(undefined,queryRef.current) as AppData;
+      const result = await requestCommunity(undefined,queryRef.current,openingPreview) as AppData;
       if (version !== refreshVersion.current) return null;
       if (result.activityVersion) { try { clearLegacyDrafts(localStorage); } catch {} }
       const serverTime=Date.parse(result.weekly.serverNow);
@@ -187,7 +193,7 @@ export default function InnovationApp() {
       }
       return null;
     } finally { if (version === refreshVersion.current) setLoading(false); }
-  }, []);
+  }, [openingPreview]);
 
   useEffect(() => {
     let disposed = false;
@@ -372,7 +378,7 @@ export default function InnovationApp() {
   }
   async function mutate(body: unknown) {
     ++refreshVersion.current;
-    const result = await requestCommunity(body,queryRef.current) as { community?: AppData; ideaId?: string };
+    const result = await requestCommunity(body,queryRef.current,openingPreview) as { community?: AppData; ideaId?: string };
     if (!result.community?.signedIn) throw new Error('ما تأكدنا من الحفظ. أعد المحاولة؛ مسودتك باقية.');
     ++refreshVersion.current;
     setData(result.community); setError(''); setLoading(false);

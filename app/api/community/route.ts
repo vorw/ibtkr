@@ -61,10 +61,13 @@ export async function GET(request: Request) {
   try {
     const user = await getParticipant(request);
     const db=database();
-    if(!(await readOpening(db,user?.userId??null)).isOpen)return reply({error:'الافتتاح ما اكتمل. شارك في قصّ الشريط أولًا.'},423);
+    const params=new URL(request.url).searchParams;
+    // A discoverable read-only preview retains normal account checks. It cannot
+    // add cuts, open the event, or bypass the POST opening guard.
+    if(params.get('openingPreview')!=='1'&&!(await readOpening(db,user?.userId??null)).isOpen)return reply({error:'الافتتاح ما اكتمل. شارك في قصّ الشريط أولًا.'},423);
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);
-    return reply(await readCommunity(db,user?.userId??null,new URL(request.url).searchParams));
+    return reply(await readCommunity(db,user?.userId??null,params));
   } catch (error) {
     console.error('Community load', error);
     return reply({ error: 'ما قدرنا نحمّل المشاركات. جرّب مرة ثانية.' }, 503);
@@ -82,6 +85,7 @@ const schema = z.discriminatedUnion('action', [
 
 export async function POST(request: Request) {
   try {
+    if(new URL(request.url).searchParams.get('openingPreview')==='1')return reply({error:'المعاينة للقراءة فقط.'},403);
     if (request.headers.get('sec-fetch-site') === 'cross-site') return reply({ error: 'طلب غير مسموح.' }, 403);
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(request.url).origin) return reply({ error: 'طلب غير مسموح.' }, 403);

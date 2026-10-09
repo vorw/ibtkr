@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUpLeft, Check, RotateCcw, Scissors, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import type { OpeningState } from '@/lib/opening';
 import { createOpeningAudio } from '@/lib/opening-audio';
 import './opening-celebration.css';
 
+// A local display shortcut, never an account privilege or a global opening.
+export const SitePreviewContext=createContext(false);
 const arabic=(n:number)=>new Intl.NumberFormat('ar-SA').format(n);
 async function requestOpening(cut=false):Promise<OpeningState>{
   const response=await fetch('/api/opening',{method:cut?'POST':'GET',cache:'no-store',credentials:'same-origin',
@@ -25,6 +27,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   const [drag,setDrag]=useState(0);
   const [opening,setOpening]=useState(false);
   const [entered,setEntered]=useState(false);
+  const [sitePreview,setSitePreview]=useState(false);
   const [soundEnabled,setSoundEnabled]=useState(true);
   const soundAllowed=useRef(true);
   const sound=useRef<ReturnType<typeof createOpeningAudio>|null>(null);
@@ -113,7 +116,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   }
   function cancel(){started.current=null;setDrag(0);}
 
-  if(entered)return <>{children}</>;
+  if(entered)return <SitePreviewContext.Provider value={sitePreview}>{children}</SitePreviewContext.Provider>;
   const count=state?.count??0,target=state?.target??(preview?2:15);
   const cutX=10+((Math.min(count,target-1)+1)/(target+1))*80;
   const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`,'--drag-energy':drag/180,'--burst-x':`${10+count/(target+1)*80}%`} as CSSProperties;
@@ -121,6 +124,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
     <div className="opening-atmosphere" aria-hidden="true"><div className="opening-aura aura-violet"/><div className="opening-aura aura-gold"/><div className="opening-aura aura-lilac"/><svg className="opening-flow-lines" viewBox="0 0 1440 900" preserveAspectRatio="none"><path d="M -120 760 C 150 380 510 860 820 450 S 1270 130 1560 180"/><path d="M -100 180 C 280 70 180 530 570 380 S 1110 510 1540 70"/><path d="M -80 870 C 280 530 660 930 1010 640 S 1250 420 1550 500"/></svg>{Array.from({length:18},(_,i)=><i className="opening-glint" key={i} style={{'--x':`${7+(i*37)%88}%`,'--y':`${13+(i*19)%73}%`,'--delay':`${-i*1.7}s`,'--duration':`${6+i%5*1.2}s`,'--rotation':`${i*31}deg`} as CSSProperties}/>)}</div>
     {opening&&<div className="opening-celebration" aria-hidden="true"><span className="opening-reveal-glow"/><span className="opening-reveal-ring"/><span className="opening-reveal-ring ring-delayed"/>{Array.from({length:32},(_,i)=><i key={i} className="opening-party-piece" style={{'--x':`${10+(i*23)%80}%`,'--drift':`${(i%7-3)*55}px`,'--spin':`${270+i*37}deg`,'--delay':`${i%8*0.035}s`} as CSSProperties}/>)}</div>}
     {preview&&<div className="opening-preview-label">معاينة بصرية · لا تغيّر الافتتاح الحقيقي</div>}
+    {!preview&&<button type="button" className="opening-hidden-entry" tabIndex={-1} aria-label="معاينة الموقع قبل الافتتاح" onClick={()=>{setSitePreview(true);setEntered(true);}}/>}
     <header className="opening-header">
       <div className="opening-brand"><img src="/assets/ftc-logo.svg" alt="نادي تقنية المستقبل" width="90" height="48"/><span/><strong>ابتكر<span>▪</span><small>لجنة الابتكار</small></strong></div>
       <div className="opening-header-actions"><span className="opening-edition"><span className="opening-live-dot"/> لحظة البداية</span><button type="button" className="opening-sound" onClick={toggleSound} aria-pressed={soundEnabled} aria-label={soundEnabled?'إيقاف المؤثرات الصوتية':'تشغيل المؤثرات الصوتية'} title={soundEnabled?'إيقاف المؤثرات الصوتية':'تشغيل المؤثرات الصوتية'}>{soundEnabled?<Volume2 size={17}/>:<VolumeX size={17}/>}<span>{soundEnabled?'الصوت':'بدون صوت'}</span></button></div>
