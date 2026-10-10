@@ -11,8 +11,8 @@ export function resetDatabase({ weekly = true, opened = true } = {}) {
   state.db.exec(readFileSync(new URL('../drizzle/0006_opening_ceremony.sql',import.meta.url),'utf8'));
   state.db.exec(readFileSync(new URL('../drizzle/0007_opening_visitors.sql',import.meta.url),'utf8'));
   if(opened){
-    state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-07',15,'2026-10-06T21:00:00.000Z');
-    for(const user of Array.from({length:15},(_,i)=>'fixture-opener-'+i))state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-07',user,'2026-10-06T21:00:00.000Z');
+    state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-10-reset-1',10,'2026-10-10T14:40:00.000Z');
+    for(const user of Array.from({length:10},(_,i)=>'fixture-opener-'+i))state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-10-reset-1',user,'2026-10-10T14:40:00.000Z');
   }
   state.databaseNow = '2026-10-15T12:00:00.000Z';
   state.db.function('test_now', () => state.databaseNow);

@@ -1,8 +1,8 @@
 import migration from '../drizzle/0006_opening_ceremony.sql?raw';
 import visitorMigration from '../drizzle/0007_opening_visitors.sql?raw';
 
-// Fresh official event; rehearsal records remain intact.
-export const openingConfig = { id: 'ibtkr-official-opening-2026-10-07', target: 10, enabled: true };
+// Restarted official event; previous contributions remain archived.
+export const openingConfig = { id: 'ibtkr-official-opening-2026-10-10-reset-1', target: 10, enabled: true };
 export type OpeningState = {
   eventId: string; target: number; count: number; isOpen: boolean;
   canCut: boolean; hasCut: boolean; position: number | null; openedAt: string | null;
