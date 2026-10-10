@@ -2,7 +2,7 @@ import migration from '../drizzle/0006_opening_ceremony.sql?raw';
 import visitorMigration from '../drizzle/0007_opening_visitors.sql?raw';
 
 // Fresh official event; rehearsal records remain intact.
-export const openingConfig = { id: 'ibtkr-official-opening-2026-10-07', target: 15, enabled: true };
+export const openingConfig = { id: 'ibtkr-official-opening-2026-10-07', target: 10, enabled: true };
 export type OpeningState = {
   eventId: string; target: number; count: number; isOpen: boolean;
   canCut: boolean; hasCut: boolean; position: number | null; openedAt: string | null;
@@ -14,6 +14,12 @@ async function ensureOpening(db: D1Database) {
     task = db.batch([
       ...[migration,visitorMigration].flatMap(source=>source.split('--> statement-breakpoint')).map(sql=>sql.trim()).filter(Boolean).map(sql=>db.prepare(sql)),
       db.prepare('INSERT OR IGNORE INTO opening_events (id,target) VALUES (?,?)').bind(openingConfig.id,openingConfig.target),
+      // Apply a changed target to the existing event without resetting cuts or
+      // its opening timestamp. A lower target can complete the ceremony now.
+      db.prepare('UPDATE opening_events SET target=? WHERE id=? AND target<>?').bind(openingConfig.target,openingConfig.id,openingConfig.target),
+      db.prepare(`UPDATE opening_events SET opened_at=? WHERE id=? AND opened_at IS NULL
+        AND (SELECT COUNT(*) FROM opening_cuts WHERE event_id=opening_events.id)>=target`)
+        .bind(new Date().toISOString(),openingConfig.id),
     ]).then(()=>{});
     ready.set(db,task);
   }

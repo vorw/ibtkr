@@ -117,7 +117,7 @@ export default function OpeningGate({children,preview=false}:{children:ReactNode
   function cancel(){started.current=null;setDrag(0);}
 
   if(entered)return <SitePreviewContext.Provider value={sitePreview}>{children}</SitePreviewContext.Provider>;
-  const count=state?.count??0,target=state?.target??(preview?2:15);
+  const count=state?.count??0,target=state?.target??(preview?2:10);
   const cutX=10+((Math.min(count,target-1)+1)/(target+1))*80;
   const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`,'--drag-energy':drag/180,'--burst-x':`${10+count/(target+1)*80}%`} as CSSProperties;
   return <div className={`opening-page${opening?' is-opening':''}${state?.hasCut?' has-cut':''}`} dir="rtl" style={style}>

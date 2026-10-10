@@ -29,7 +29,7 @@ test('anonymous visits get a secure server-issued cookie and reveal no participa
   state.user=null;const {response,cookie,data}=await visit();assert.equal(response.status,200);
   assert.equal(response.headers.get('cache-control'),'private, no-store');assert.equal(response.headers.get('vary'),'Cookie');
   for(const flag of ['HttpOnly','Secure','SameSite=Strict','Path=/','Max-Age=2592000'])assert.ok(response.headers.get('set-cookie').includes(flag));
-  assert.deepEqual(data,{eventId:openingConfig.id,target:15,count:0,isOpen:false,canCut:true,hasCut:false,position:null,openedAt:null});
+  assert.deepEqual(data,{eventId:openingConfig.id,target:10,count:0,isOpen:false,canCut:true,hasCut:false,position:null,openedAt:null});
   assert.ok(cookie.startsWith('__Host-ibtkr-opening='));assert.equal(JSON.stringify(data).includes(cookie.split('=')[1]),false);
   const repeat=await visit(cookie);assert.equal(repeat.response.headers.get('set-cookie'),null);
   assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_visitors').get().n,1);
@@ -41,20 +41,20 @@ test('guests can cut without login; retries, refreshes and a later login keep on
   assert.equal((await (await POST(request(cookie))).json()).count,1);
   const refreshed=(await visit(cookie)).data;assert.equal(refreshed.hasCut,true);assert.equal(refreshed.position,1);assert.equal(refreshed.count,1);
 });
-test('the fifteenth visitor opens once, with stable private order even when timestamps tie',async()=>{
-  const db=database(),ids=await visitors(db,16);
-  for(let i=0;i<15;i++){const s=await cutOpening(db,ids[i]);assert.equal(s.count,i+1);assert.equal(s.position,i+1);assert.equal(s.isOpen,i===14);}
+test('the tenth visitor opens once, with stable private order even when timestamps tie',async()=>{
+  const db=database(),ids=await visitors(db,11);
+  for(let i=0;i<10;i++){const s=await cutOpening(db,ids[i]);assert.equal(s.count,i+1);assert.equal(s.position,i+1);assert.equal(s.isOpen,i===9);}
   const timestamp=(await readOpening(db,null)).openedAt;mock.timers.tick(60000);
-  const later=await cutOpening(db,ids[15]);assert.equal(later.count,15);assert.equal(later.hasCut,false);assert.equal(later.position,null);assert.equal(later.openedAt,timestamp);
+  const later=await cutOpening(db,ids[10]);assert.equal(later.count,10);assert.equal(later.hasCut,false);assert.equal(later.position,null);assert.equal(later.openedAt,timestamp);
   assert.equal((await cutOpening(db,ids[0])).position,1);assert.equal((await readOpening(db,null)).isOpen,true);
   assert.equal(state.db.prepare('SELECT COUNT(DISTINCT cut_at) n FROM opening_cuts').get().n,1);
 });
-test('forty simultaneous cuts stop at fifteen and assign each accepted visitor a distinct order',async()=>{
+test('forty simultaneous cuts stop at ten and assign each accepted visitor a distinct order',async()=>{
   const db=database(),ids=await visitors(db,40);const results=await Promise.all(ids.map(id=>cutOpening(db,id)));
-  assert.ok(results.every(r=>r.count<=15));assert.equal((await readOpening(db,null)).count,15);
-  const accepted=results.filter(r=>r.hasCut);assert.equal(accepted.length,15);
-  assert.deepEqual(accepted.map(r=>r.position).sort((a,b)=>a-b),Array.from({length:15},(_,i)=>i+1));
-  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,15);
+  assert.ok(results.every(r=>r.count<=10));assert.equal((await readOpening(db,null)).count,10);
+  const accepted=results.filter(r=>r.hasCut);assert.equal(accepted.length,10);
+  assert.deepEqual(accepted.map(r=>r.position).sort((a,b)=>a-b),Array.from({length:10},(_,i)=>i+1));
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,10);
 });
 test('missing or forged cookies and spoofed account headers cannot invent a participant',async()=>{
   state.user=null;assert.equal((await POST(request(null))).status,409);
@@ -66,7 +66,7 @@ test('missing or forged cookies and spoofed account headers cannot invent a part
 test('cross-site, malformed and oversized requests never count',async()=>{
   const {cookie}=await visit();
   for(const headers of [{Origin:'https://evil.test'},{'sec-fetch-site':'cross-site'}])assert.equal((await POST(request(cookie,{action:'cut'},headers))).status,403);
-  for(const body of ['{broken','x'.repeat(1001),{action:'reset'},{action:'cut',count:15}])assert.equal((await POST(request(cookie,body))).status,400);
+  for(const body of ['{broken','x'.repeat(1001),{action:'reset'},{action:'cut',count:10}])assert.equal((await POST(request(cookie,body))).status,400);
   assert.equal((await readOpening(database(),null)).count,0);
 });
 test('new browsers get distinct visitor tokens without creating account profiles or recording contact information',async()=>{
@@ -76,25 +76,25 @@ test('new browsers get distinct visitor tokens without creating account profiles
   assert.equal(state.db.prepare('SELECT COUNT(*) n FROM profiles').get().n,0);
   assert.deepEqual(state.db.prepare('PRAGMA table_info(opening_visitors)').all().map(c=>c.name),['id','event_id','created_at']);
 });
-test('community stays closed through fourteen cuts then opens without changing week 01 or email eligibility',async()=>{
-  const db=database(),ids=await visitors(db,15);
+test('community stays closed through nine cuts then opens without changing week 01 or email eligibility',async()=>{
+  const db=database(),ids=await visitors(db,10);
   const read=()=>community.GET(new Request('https://ibtkr.space/api/community'));
   const write=()=>community.POST(new Request('https://ibtkr.space/api/community',{method:'POST',headers:{Origin:'https://ibtkr.space','Content-Type':'application/json'},body:JSON.stringify({action:'profile',displayName:'أحمد'})}));
   assert.equal((await read()).status,423);assert.equal((await write()).status,423);
-  for(let i=0;i<14;i++)await cutOpening(db,ids[i]);assert.equal((await read()).status,423);
-  await cutOpening(db,ids[14]);const opened=await read();assert.equal(opened.status,200);
+  for(let i=0;i<9;i++)await cutOpening(db,ids[i]);assert.equal((await read()).status,423);
+  await cutOpening(db,ids[9]);const opened=await read();assert.equal(opened.status,200);
   const data=await opened.json();assert.equal(data.weekly.current.id,'week-2026-10-14');assert.equal(data.weekly.current.number,'01');
   assert.equal((await write()).status,200);assert.deepEqual(data.progress,{ideas:0,reviews:0,xp:0});
 });
-test('a failed fifteenth-cut transaction rolls back both the count and opening and retries safely',async()=>{
-  const db=database(),ids=await visitors(db,15);for(let i=0;i<14;i++)await cutOpening(db,ids[i]);let fail=true;
+test('a failed tenth-cut transaction rolls back both the count and opening and retries safely',async()=>{
+  const db=database(),ids=await visitors(db,10);for(let i=0;i<9;i++)await cutOpening(db,ids[i]);let fail=true;
   const broken={...db,prepare(sql){
     if(sql.startsWith('UPDATE opening_events'))return {bind(...values){return {async run(){if(fail)throw Error('Simulated opening write failure');return db.prepare(sql).bind(...values).run();}};}};
     return db.prepare(sql);
   }};
-  await assert.rejects(cutOpening(broken,ids[14]),/Simulated opening write failure/);
-  const closed=await readOpening(db,ids[14]);assert.equal(closed.count,14);assert.equal(closed.hasCut,false);assert.equal(closed.isOpen,false);
-  fail=false;assert.equal((await cutOpening(broken,ids[14])).position,15);assert.equal((await readOpening(db,null)).isOpen,true);
+  await assert.rejects(cutOpening(broken,ids[9]),/Simulated opening write failure/);
+  const closed=await readOpening(db,ids[9]);assert.equal(closed.count,9);assert.equal(closed.hasCut,false);assert.equal(closed.isOpen,false);
+  fail=false;assert.equal((await cutOpening(broken,ids[9])).position,10);assert.equal((await readOpening(db,null)).isOpen,true);
 });
 test('a fresh event retains older contributions and prevents their visitor cookies carrying over',async()=>{
   const original=openingConfig.id,db=database(),id=await createOpeningVisitor(db);await cutOpening(db,id);
@@ -103,9 +103,9 @@ test('a fresh event retains older contributions and prevents their visitor cooki
   assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts WHERE event_id=?').get(original).n,1);
 });
 test('after opening, new arrivals do not create more visitor records or receive another ceremony',async()=>{
-  const db=database(),ids=await visitors(db,15);for(const id of ids)await cutOpening(db,id);
+  const db=database(),ids=await visitors(db,10);for(const id of ids)await cutOpening(db,id);
   const result=await visit();assert.equal(result.data.isOpen,true);assert.equal(result.data.canCut,false);assert.equal(result.response.headers.get('set-cookie'),null);
-  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_visitors').get().n,15);
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_visitors').get().n,10);
 });
 test('disabling the gate preserves visitor and cut records',async()=>{
   const db=database(),id=await createOpeningVisitor(db);await cutOpening(db,id);openingConfig.enabled=false;
@@ -137,7 +137,19 @@ test('preview reads retain ordinary signed-in identity while every preview write
   assert.equal((await write()).status,423);
   assert.equal(state.db.prepare('SELECT COUNT(*) n FROM profiles').get().n,0);
   assert.equal((await readOpening(db,null)).count,0);
-  const ids=await visitors(db,15);for(const id of ids)await cutOpening(db,id);
+  const ids=await visitors(db,10);for(const id of ids)await cutOpening(db,id);
   assert.equal((await write('?openingPreview=1')).status,403);
   assert.equal((await write()).status,200);
+});
+
+
+test('lowering an existing target keeps all cuts and opens immediately if already reached',async()=>{
+  for(const count of [2,10]){
+    resetDatabase({opened:false});const db=database();
+    state.db.prepare('INSERT INTO opening_events (id,target) VALUES (?,?)').run(openingConfig.id,15);
+    for(let i=0;i<count;i++)state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run(openingConfig.id,'existing-'+i,'2026-10-10T12:00:00.000Z');
+    const result=await readOpening(db,null);assert.equal(result.target,10);assert.equal(result.count,count);assert.equal(result.isOpen,count===10);
+    const openedAt=result.openedAt;const repeat=await readOpening(db,null);assert.equal(repeat.openedAt,openedAt);
+    assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,count);
+  }
 });
