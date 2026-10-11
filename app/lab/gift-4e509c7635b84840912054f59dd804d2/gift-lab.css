@@ -18,3 +18,36 @@
 /* Scale all three axes, including perspective depth. */
 .gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale3d(.62,.62,.62);scale:none;top:58%}
 @media(max-width:600px){.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale3d(.5,.5,.5);top:58%}}
+
+/* Keep pointer manipulation separate from document text selection. */
+.gift-stage,.gift-stage *,.gift-toolbar,.gift-views{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.gift-stage svg,.gift-stage img{pointer-events:none;-webkit-user-drag:none}
+.gift-inscription{inset:65px 15px auto;font-family:inherit;letter-spacing:0;color:#f3e6ff;text-shadow:0 1px 0 #ffffff25,0 2px 3px #1b0b30aa;direction:rtl}
+.gift-inscription b{font-size:34px;font-weight:600;white-space:nowrap}
+.gift-inscription b span{color:#edcd8d;margin-right:5px}
+.gift-inscription small{font-family:inherit;font-size:10px;letter-spacing:0;color:#dac8eb;margin-top:10px}
+.gift-steps>div{padding:13px 12px;border:1px solid #e3dae9;border-radius:7px;margin-bottom:8px;transition:background .25s,border-color .25s,box-shadow .25s}
+.gift-steps .current{border:2px solid #8053bf;padding:12px 11px;background:#eee5fb;color:#5d329b;box-shadow:0 0 0 3px #8053bf0d}
+.gift-steps .current b{font-weight:600}
+.gift-steps .current small{font-weight:600;color:#5d329b}
+.gift-steps .done{border-color:#ccbadd;background:#f5effb;color:#7a6190}
+.gift-actions{border:1px solid #bfa6dc;border-radius:8px;padding:15px;background:#ffffff8c}
+.gift-actions>b{font-weight:600;color:#603690}
+.gift-actions .gift-lock-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));direction:ltr;gap:6px}
+.gift-lock-controls button{direction:rtl;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 3px;min-width:0}
+.gift-lock-controls b{font-size:12px;font-weight:600}
+.gift-lock-controls span{font-size:12px;color:#664d7d}
+.gift-lock-controls small{font-size:10px;color:#8c6c27;background:#fbf3df;padding:3px;border-radius:3px;white-space:nowrap}
+.gift-lock-controls button.matched{border-color:#bfa052;background:#fffcf2}
+.gift-actions .gift-lock-rule{font-size:10px;line-height:1.9;color:#887497;margin:10px 0 0}
+.gift-slot-label{position:absolute;top:132px;left:-10px;width:44px;font-size:8px;text-align:center;direction:rtl;color:#e2d2ed}
+.gift-shape-controls button{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;padding:8px 2px}
+.gift-shape-controls button span{font-size:10px}
+.gift-shape-controls svg{width:22px;height:22px;flex-shrink:0}
+.gift-seal button svg{width:19px;height:19px;vertical-align:middle}
+.gift-bottom-code{inset:34px 18px;text-align:center;direction:rtl}
+.gift-bottom-code>small{font-family:inherit;font-size:9px;letter-spacing:0;color:#cdbbdb}
+.gift-bottom-code b{font-family:inherit;font-size:17px;line-height:1.8;color:#f5dfae;margin:9px 0}
+.gift-bottom-code b span{display:block;font-size:inherit;color:inherit;white-space:nowrap}
+.gift-bottom-code>span{font-size:9px;color:#d9c6e8}
+@media(max-width:600px){.gift-steps{gap:7px}.gift-steps>div{padding:10px 7px;gap:5px;flex-wrap:wrap;margin:0}.gift-steps .current{padding:9px 6px}.gift-steps b{font-size:10px}.gift-actions{padding:12px}.gift-lock-controls b{font-size:12px}}
