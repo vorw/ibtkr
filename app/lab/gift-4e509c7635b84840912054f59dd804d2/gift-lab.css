@@ -8,3 +8,9 @@
 .gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(.68);top:64%}
 .gift-bottom-code b{font-size:18px;color:#f0dcba}
 @media(max-width:600px){.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(.55);top:68%}}
+
+/* The lid follows the rear wall; keep the entire unfolded net in frame. */
+.gift-open .gift-top{transform:translateY(220px) translateZ(-110px) rotateX(95deg) translateY(-220px) rotateX(205deg);transition-delay:.28s}
+.gift-open .gift-back{transition-delay:.28s}
+.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(.5);top:62%}
+@media(max-width:600px){.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(.46);top:63%}}
