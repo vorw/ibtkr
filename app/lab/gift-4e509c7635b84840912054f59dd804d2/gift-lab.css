@@ -14,3 +14,7 @@
 .gift-open .gift-back{transition-delay:.28s}
 .gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(.5);top:62%}
 @media(max-width:600px){.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(.46);top:63%}}
+
+/* Scale all three axes, including perspective depth. */
+.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale3d(.62,.62,.62);scale:none;top:58%}
+@media(max-width:600px){.gift-open .gift-object{transform:rotateX(var(--rx)) rotateY(var(--ry)) scale3d(.5,.5,.5);top:58%}}
