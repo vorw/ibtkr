@@ -51,3 +51,6 @@
 .gift-bottom-code b span{display:block;font-size:inherit;color:inherit;white-space:nowrap}
 .gift-bottom-code>span{font-size:9px;color:#d9c6e8}
 @media(max-width:600px){.gift-steps{gap:7px}.gift-steps>div{padding:10px 7px;gap:5px;flex-wrap:wrap;margin:0}.gift-steps .current{padding:9px 6px}.gift-steps b{font-size:10px}.gift-actions{padding:12px}.gift-lock-controls b{font-size:12px}}
+
+.gift-slot-label{top:-17px}
+.gift-bottom-code b{direction:rtl}
