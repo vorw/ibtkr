@@ -512,6 +512,21 @@ describe('Community operations against the real route and SQLite schema', () => 
     assert.equal(challengeStatus(first,new Date(first.endsAt)),'closed');
   });
 
+  test('week two uses the approved try-before-buy challenge without changing week one or the rollover',async()=>{
+    const {currentChallenge,weeklyChallenges}=await import('../lib/weekly.ts');
+    assert.equal(weeklyChallenges[0].title,'إلغاء الاشتراك… بدون دوّامة.');
+    const next=currentChallenge(new Date('2026-10-16T21:00:00.000Z'));
+    assert.equal(next.id,'week-2026-10-21');
+    assert.equal(next.title,'جرّبها… قبل ما تشتريها.');
+    assert.equal(next.endsAt,'2026-10-23T21:00:00.000Z');
+    assert.deepEqual(next.angles.map(angle=>angle.prompt),[
+      'كيف تخلي تجربة المنتج تبدأ قبل الدفع؟',
+      'بدل ما الشخص يبحث عن منتج يناسبه، كيف تخلي المنتج يثبت إنه مناسب له؟',
+      'ماذا لو عندك دقيقة واحدة فقط عشان تساعده يعرف هل المنتج يناسبه؟',
+    ]);
+    assert.ok(next.angles.every(angle=>angle.hint.trim()));
+  });
+
   test('twenty official launch weeks are contiguous and each boundary selects exactly its next challenge',async()=>{
     const {currentChallenge,weeklyChallenges,validateSchedule}=await import('../lib/weekly.ts');
     validateSchedule();assert.equal(weeklyChallenges.length,20);
