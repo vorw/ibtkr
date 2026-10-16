@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 
 export const state = { user: null, db: null, failReads: false, failReadAfterWrite: false, databaseNow: '2026-10-15T12:00:00.000Z' };
-export function resetDatabase({ weekly = true, opened = true } = {}) {
+export function resetDatabase({ weekly = true, opened = true, ribbonOpened = true } = {}) {
   state.db?.close();
   state.db = new DatabaseSync(':memory:');
   for (const file of ['../drizzle/0000_purple_toad.sql', '../drizzle/0001_unique_profiles.sql', ...(weekly ? ['../drizzle/0002_weekly_challenges.sql'] : [])]) {
@@ -15,6 +15,11 @@ export function resetDatabase({ weekly = true, opened = true } = {}) {
     for(const user of Array.from({length:10},(_,i)=>'fixture-opener-'+i))state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run('ibtkr-official-opening-2026-10-10-reset-1',user,'2026-10-10T14:40:00.000Z');
   }
   state.databaseNow = '2026-10-15T12:00:00.000Z';
+  if(opened&&ribbonOpened){
+    const event='ibtkr-weekly-ribbon-week-2026-10-21';
+    state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run(event,10,'2026-10-16T21:00:00.000Z');
+    for(let i=0;i<10;i++)state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run(event,'weekly-fixture-'+i,'2026-10-16T21:00:00.000Z');
+  }
   state.db.function('test_now', () => state.databaseNow);
   state.user = 'alice'; state.failReads = false; state.failReadAfterWrite = false;
 }

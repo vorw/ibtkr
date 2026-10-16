@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { state,resetDatabase,database } from './community-fixture.mjs';
 registerHooks({resolve(s,c,next){
   const aliases={'@/lib/auth-server':'./community-fixture.mjs','@/lib/database':'./community-fixture.mjs',
+    '@/lib/weekly-opening':'../lib/weekly-opening.ts','./weekly-ribbon-policy':'../lib/weekly-ribbon-policy.ts',
     '@/lib/opening':'../lib/opening.ts','@/lib/challenges':'../lib/challenges.ts','@/lib/profile':'../lib/profile.ts',
     '@/lib/community-read':'../lib/community-read.ts','@/lib/weekly-schema':'../lib/weekly-schema.ts','@/lib/weekly':'../lib/weekly.ts',
     './weekly':'../lib/weekly.ts','./weekly-content':'../lib/weekly-content.ts','./weekly-db':'../lib/weekly-db.ts'};

@@ -7,6 +7,7 @@ import { findWeek, currentChallenge } from '@/lib/weekly';
 import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
 import { readOpening } from '@/lib/opening';
+import { readWeeklyOpening,concealWeeklyQuestion } from '@/lib/weekly-opening';
 
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown, status = 200) => Response.json(data, {
@@ -57,6 +58,16 @@ async function getProfile(db: D1Database, userId: string): Promise<ProfileRow | 
   return db.prepare('SELECT display_name,name_key FROM profiles WHERE user_id=?').bind(userId).first<ProfileRow>();
 }
 
+async function visibleCommunity(...args:Parameters<typeof readCommunity>){
+  const result=await readCommunity(...args),current=result.weekly.current;
+  if(current&&!(await readWeeklyOpening(args[0],current)).isOpen){
+    result.weekly.current=concealWeeklyQuestion(current);
+    if(result.weekly.selected?.id===current.id)result.weekly.selected=concealWeeklyQuestion(current);
+    result.weekly.weeks=result.weekly.weeks.map(week=>week.id===current.id?concealWeeklyQuestion(week):week);
+  }
+  return result;
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getParticipant(request);
@@ -67,7 +78,7 @@ export async function GET(request: Request) {
     if(params.get('openingPreview')!=='1'&&!(await readOpening(db,user?.userId??null)).isOpen)return reply({error:'الافتتاح ما اكتمل. شارك في قصّ الشريط أولًا.'},423);
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);
-    return reply(await readCommunity(db,user?.userId??null,params));
+    return reply(await visibleCommunity(db,user?.userId??null,params));
   } catch (error) {
     console.error('Community load', error);
     return reply({ error: 'ما قدرنا نحمّل المشاركات. جرّب مرة ثانية.' }, 503);
@@ -105,6 +116,10 @@ export async function POST(request: Request) {
     const value = parsed.data;
     const db = database();
     if(!(await readOpening(db,user.userId)).isOpen)return reply({error:'المشاركة تفتح بعد اكتمال الافتتاح.'},423);
+    if(value.action==='idea'||value.action==='edit'){
+      const current=currentChallenge();
+      if(current&&!(await readWeeklyOpening(db,current)).isOpen)return reply({error:'سؤال الأسبوع ينتظر عشر قصّات لفتحه للجميع.'},423);
+    }
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);
     const now = new Date().toISOString();
@@ -147,7 +162,7 @@ export async function POST(request: Request) {
         throw error;
       }
 
-      return reply({ ok: true, community: await readCommunity(db,user.userId,new URL(request.url).searchParams) });
+      return reply({ ok: true, community: await visibleCommunity(db,user.userId,new URL(request.url).searchParams) });
     }
 
     const profile = await getProfile(db, user.userId);
@@ -162,7 +177,7 @@ export async function POST(request: Request) {
       const previous=await db.prepare('SELECT user_id,challenge_id,angle_id,title,body FROM ideas WHERE id=?').bind(value.id).first<IdeaRow>();
       if(previous){
         if(previous.user_id!==user.userId || previous.challenge_id!==value.challengeId || previous.angle_id!==value.angleId || previous.title!==value.title || previous.body!==value.body) return reply({error:'سبق حفظ نسخة مختلفة من هذه المسودة.'},409);
-        return reply({ok:true,ideaId,community:await readCommunity(db,user.userId,new URL(request.url).searchParams,ideaId)});
+        return reply({ok:true,ideaId,community:await visibleCommunity(db,user.userId,new URL(request.url).searchParams,ideaId)});
       }
       if(currentChallenge()?.id!==week.id) return reply({error:'انتهت المشاركة لهذا الأسبوع. جرّب التحدّي الحالي؛ مسودتك باقية.'},409);
       if(!week.angles.some(angle=>angle.id===value.angleId)) return reply({error:'اختر زاوية من زوايا التحدّي.'},400);
@@ -212,7 +227,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return reply({ ok: true, ideaId, community: await readCommunity(db,user.userId,new URL(request.url).searchParams,ideaId) });
+    return reply({ ok: true, ideaId, community: await visibleCommunity(db,user.userId,new URL(request.url).searchParams,ideaId) });
   } catch (error) {
     console.error('Community save', error);
     return reply({ error: 'ما تأكدنا من الحفظ. كلامك موجود؛ جرّب مرة ثانية ولن تتكرر المشاركة.' }, 503);

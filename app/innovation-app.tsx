@@ -1,6 +1,7 @@
 'use client';
 
-import { SitePreviewContext } from './opening-gate';
+import OpeningGate, { SitePreviewContext } from './opening-gate';
+import { weeklyRibbonFor } from '@/lib/weekly-ribbon-policy';
 
 import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode, type PointerEvent } from 'react';
 import { flushSync } from 'react-dom';
@@ -27,6 +28,9 @@ type Draft = IdeaDraft;
 class SignInRequired extends Error {}
 const icons = { shuffle: Shuffle, flip: RotateCcw, people: Users };
 const palette = ['violet', 'acid', 'signal'] as const;
+function WeeklyChallengeGate({week,onOpen,children}:{week:Challenge|null;onOpen:()=>void;children:ReactNode}){
+  return weeklyRibbonFor(week)?<OpeningGate key={week!.id} weekId={week!.id} onOpen={onOpen}>{children}</OpeningGate>:children;
+}
 const nav = [{ id: 'home', label: 'تحدّي الأسبوع' }, { id: 'ideas', label: 'المجتمع' }, { id: 'leaderboard', label: 'المتصدرون' }, { id: 'profile', label: 'رحلتك' }] as const;
 const date = (value: string) => new Intl.DateTimeFormat('ar-SA', { timeZone:'Asia/Riyadh',day: 'numeric', month: 'short', calendar: 'gregory' }).format(new Date(value));
 const storage = {
@@ -348,6 +352,7 @@ export default function InnovationApp() {
   }
   function start(challenge: Challenge, idea?: Idea, angleId=angle?.id) {
     if(currentChallenge()?.id!==challenge.id){toast.error('أُغلق هذا التحدّي. انتظر تحدّي الأسبوع القادم.');return;}
+    if(mission?.id===challenge.id&&!mission.angles.length){changeTab('home');toast('نفتح سؤال الأسبوع معًا بعد عشر قصّات.');return;}
     const chosen = challenge.angles.find(item => item.id === (idea?.angle_id ?? angleId));
     if (!chosen) { chooseAngle(); return; }
     angleId = chosen.id;
@@ -457,9 +462,9 @@ export default function InnovationApp() {
     type ModelContext={registerTool:(tool:unknown,options:{signal:AbortSignal})=>unknown};
     const context=(document as Document & {modelContext?:ModelContext}).modelContext;if(!context)return;
     const controller=new AbortController();
-    try{context.registerTool({name:'read_weekly_challenge',description:'Read the active weekly challenge and its three angles. Does not submit or vote.',inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:true},execute:()=>({challenge:currentChallenge()})},{signal:controller.signal});}catch{}
+    try{context.registerTool({name:'read_weekly_challenge',description:'Read the currently revealed weekly challenge. Does not submit, vote, or bypass the ribbon.',inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:true},execute:()=>({challenge:data.weekly.current})},{signal:controller.signal});}catch{}
     return()=>controller.abort();
-  },[]);
+  },[data.weekly.current]);
 
   const ideaCards = (items: Idea[]) => items.map((idea) => <IdeaCard key={idea.id} idea={idea} busy={busy} onOpen={openIdea} onReact={(item) => void react(item)} />);
 
@@ -478,6 +483,7 @@ export default function InnovationApp() {
         {error && <div className="system-banner error" role="alert"><span>{error}</span><button onClick={() => void refresh()}>إعادة المحاولة</button></div>}
         {closedWeek&&<div className="week-change-notice" role="status"><Trophy size={22}/><div><strong>انتهى تحدّي الأسبوع {closedWeek.number}.</strong><p>{data.weekly.current?'النتائج محفوظة، والتحدّي الجديد جاهز.':'النتائج محفوظة. ننتظرك في التحدّي القادم.'}</p></div><Button className="outline-button" onClick={()=>showClosedResults(closedWeek)}>شاهد النتائج</Button><button className="week-notice-close" aria-label="إغلاق إشعار نهاية الأسبوع" onClick={()=>setClosedWeek(null)}><X size={18}/></button></div>}
         <TabsContent value="home" className="page-stage">
+          <WeeklyChallengeGate week={mission} onOpen={()=>{void refresh();}}>
           <div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>
           {mission ? <section className="mission-layout weekly-layout" aria-label="تحدّي الأسبوع">
             <article key={mission.id} className="mission-hero tone-violet" onPointerMove={moveSpotlight}>
@@ -494,6 +500,7 @@ export default function InnovationApp() {
             </aside>
           </section> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
           <Reveal className="community-preview section-block"><div className="section-heading"><div><span className="eyebrow">من المجتمع</span><h2>فكرة منك.<br/><span>وزاوية من غيرك.</span></h2></div><div className="section-aside"><p>اقرأ الحلول، ناقشها، وصوّت للفكرة اللي تلفتك.</p><button className="text-link" onClick={()=>{setWeekFilter('current');setAngleFilter('all');setSearch('');setPage(1);setFilter('all');changeTab('ideas')}}>شاهد المشاركات</button></div></div>{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas',...(findWeek(weekFilter)?{week:weekFilter}:{})})}/>:data.ideas.length?<div className="idea-grid">{ideaCards(data.ideas.slice(0,3))}</div>:<EmptyState onStart={()=>changeTab('home')}/>}</Reveal>
+          </WeeklyChallengeGate>
         </TabsContent>
 
         <TabsContent value="ideas" className="page-stage"><header className="page-header"><div><span className="eyebrow">حلول المجتمع</span><h1>نفس المشكلة.<br/>أفكار ما تتشابه.</h1></div>{mission&&<Button className="launch-button" onClick={()=>start(mission)}>شارك حلّك <Plus size={20}/></Button>}</header>
