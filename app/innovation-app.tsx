@@ -28,8 +28,15 @@ type Draft = IdeaDraft;
 class SignInRequired extends Error {}
 const icons = { shuffle: Shuffle, flip: RotateCcw, people: Users };
 const palette = ['violet', 'acid', 'signal'] as const;
-function WeeklyChallengeGate({week,onOpen,children}:{week:Challenge|null;onOpen:()=>void;children:ReactNode}){
-  return weeklyRibbonFor(week)?<OpeningGate key={week!.id} weekId={week!.id} onOpen={onOpen}>{children}</OpeningGate>:children;
+function WeeklyChallengeGate({week,isOpen,onOpen,children}:{week:Challenge|null;isOpen:boolean|undefined;onOpen:()=>void;children:ReactNode}){
+  // Remember only a ceremony this mounted page actually waited for. That lets
+  // its final cut animate, while refreshes and later visits skip it entirely.
+  const [closedWeek,setClosedWeek]=useState<string|null>(null);
+  useEffect(()=>{if(week&&isOpen===false)setClosedWeek(week.id);},[week?.id,isOpen]);
+  if(!weeklyRibbonFor(week))return children;
+  if(isOpen===undefined)return <section className="section-block" aria-label="تحميل تحدّي الأسبوع" aria-busy="true"><Skeleton className="feed-skeleton"/></section>;
+  if(isOpen&&closedWeek!==week!.id)return children;
+  return <OpeningGate key={week!.id} weekId={week!.id} onOpen={onOpen}>{children}</OpeningGate>;
 }
 const nav = [{ id: 'home', label: 'تحدّي الأسبوع' }, { id: 'ideas', label: 'المجتمع' }, { id: 'leaderboard', label: 'المتصدرون' }, { id: 'profile', label: 'رحلتك' }] as const;
 const date = (value: string) => new Intl.DateTimeFormat('ar-SA', { timeZone:'Asia/Riyadh',day: 'numeric', month: 'short', calendar: 'gregory' }).format(new Date(value));
@@ -483,7 +490,7 @@ export default function InnovationApp() {
         {error && <div className="system-banner error" role="alert"><span>{error}</span><button onClick={() => void refresh()}>إعادة المحاولة</button></div>}
         {closedWeek&&<div className="week-change-notice" role="status"><Trophy size={22}/><div><strong>انتهى تحدّي الأسبوع {closedWeek.number}.</strong><p>{data.weekly.current?'النتائج محفوظة، والتحدّي الجديد جاهز.':'النتائج محفوظة. ننتظرك في التحدّي القادم.'}</p></div><Button className="outline-button" onClick={()=>showClosedResults(closedWeek)}>شاهد النتائج</Button><button className="week-notice-close" aria-label="إغلاق إشعار نهاية الأسبوع" onClick={()=>setClosedWeek(null)}><X size={18}/></button></div>}
         <TabsContent value="home" className="page-stage">
-          <WeeklyChallengeGate week={mission} onOpen={()=>{void refresh();}}>
+          <WeeklyChallengeGate week={mission} isOpen={data.weekly.current?.id===mission?.id?data.weekly.ribbonOpen:undefined} onOpen={()=>{void refresh();}}>
           <div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>
           {mission ? <section className="mission-layout weekly-layout" aria-label="تحدّي الأسبوع">
             <article key={mission.id} className="mission-hero tone-violet" onPointerMove={moveSpotlight}>

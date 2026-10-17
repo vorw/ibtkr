@@ -33,13 +33,13 @@ test('forty concurrent visitors open exactly at twenty; later arrivals remain op
 });
 test('leaderboard and profiles stay accessible while question details and submissions wait for twenty cuts',async()=>{
   const response=await community.GET(new Request('https://ibtkr.space/api/community'));assert.equal(response.status,200);
-  const result=await response.json();assert.equal(result.weekly.current.id,week.id);assert.equal(result.weekly.current.description,'');assert.deepEqual(result.weekly.current.angles,[]);
+  const result=await response.json();assert.equal(result.weekly.ribbonOpen,false);assert.equal(result.weekly.current.id,week.id);assert.equal(result.weekly.current.description,'');assert.deepEqual(result.weekly.current.angles,[]);
   assert.equal(result.weekly.weeks.find(w=>w.number==='01').title,'إلغاء الاشتراك… بدون دوّامة.');
   state.user='alice';const req=body=>new Request('https://ibtkr.space/api/community',{method:'POST',headers:{Origin:'https://ibtkr.space'},body:JSON.stringify(body)});
   assert.equal((await community.POST(req({action:'profile',displayName:'سالم'}))).status,200);
   assert.equal((await community.POST(req({action:'idea',id:crypto.randomUUID(),challengeId:week.id,angleId:'change',title:'فكرة',body:'وصف فكرة كامل للتجربة الجديدة.'}))).status,423);
   const db=database();for(let i=0;i<20;i++)await cutWeeklyOpening(db,week,await weeklyVisitor(db,week,null,true));
-  const opened=await (await community.GET(new Request('https://ibtkr.space/api/community'))).json();assert.equal(opened.weekly.current.title,week.title);assert.equal(opened.weekly.current.angles.length,3);
+  const opened=await (await community.GET(new Request('https://ibtkr.space/api/community'))).json();assert.equal(opened.weekly.ribbonOpen,true);assert.equal(opened.weekly.current.title,week.title);assert.equal(opened.weekly.current.angles.length,3);
 });
 test('old week requests and cross-site cuts cannot affect the current ribbon',async()=>{
   assert.equal((await api.GET(new Request(url.replace(week.id,weeklyChallenges[0].id)))).status,409);

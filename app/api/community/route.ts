@@ -60,7 +60,8 @@ async function getProfile(db: D1Database, userId: string): Promise<ProfileRow | 
 
 async function visibleCommunity(...args:Parameters<typeof readCommunity>){
   const result=await readCommunity(...args),current=result.weekly.current;
-  if(current&&!(await readWeeklyOpening(args[0],current)).isOpen){
+  result.weekly.ribbonOpen=current?(await readWeeklyOpening(args[0],current)).isOpen:true;
+  if(current&&!result.weekly.ribbonOpen){
     result.weekly.current=concealWeeklyQuestion(current);
     if(result.weekly.selected?.id===current.id)result.weekly.selected=concealWeeklyQuestion(current);
     result.weekly.weeks=result.weekly.weeks.map(week=>week.id===current.id?concealWeeklyQuestion(week):week);
