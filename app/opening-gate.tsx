@@ -4,6 +4,7 @@ import { createContext, useCallback, useEffect, useRef, useState, type CSSProper
 import { ArrowDown, ArrowUpLeft, Check, RotateCcw, Scissors, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import type { OpeningState } from '@/lib/opening';
 import { createOpeningAudio } from '@/lib/opening-audio';
+import { weeklyRibbonTarget } from '@/lib/weekly-ribbon-policy';
 import './opening-celebration.css';
 
 // A local display shortcut, never an account privilege or a global opening.
@@ -118,7 +119,7 @@ export default function OpeningGate({children,preview=false,weekId,onOpen}:{chil
   function cancel(){started.current=null;setDrag(0);}
 
   if(entered)return <SitePreviewContext.Provider value={sitePreview}>{children}</SitePreviewContext.Provider>;
-  const count=state?.count??0,target=state?.target??(preview?2:10);
+  const count=state?.count??0,target=state?.target??(preview?2:weekId?weeklyRibbonTarget:10);
   const cutX=10+((Math.min(count,target-1)+1)/(target+1))*80;
   const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`,'--drag-energy':drag/180,'--burst-x':`${10+count/(target+1)*80}%`} as CSSProperties;
   const MainTag=weekId?'section':'main';
@@ -134,7 +135,7 @@ export default function OpeningGate({children,preview=false,weekId,onOpen}:{chil
     <MainTag className="opening-main" id={weekId?'weekly-opening-content':'main-content'} aria-label={weekId?'افتتاح تحدّي الأسبوع':undefined}>
       <div className="opening-copy"><span className="opening-eyebrow">قصّة صغيرة. بداية كبيرة.</span>
         <h1>{opening?<>فتحناها<span>معًا.</span></>:<>البداية<span>بأيديكم.</span></>}</h1>
-        <p>{weekId?(opening?'تحدّي الأسبوع انفتح. فكرتك تبدأ الآن.':'عشر قصّات تكشف سؤال الأسبوع للجميع. باقي صفحات ابتكر متاحة لك.'):opening?'أهلًا في ابتكر. الفكرة القادمة تبدأ منك.':'شريط واحد، وبداية نصنعها معًا. قصّة منك، ونفتح ابتكر للجميع.'}</p>
+        <p>{weekId?(opening?'تحدّي الأسبوع انفتح. فكرتك تبدأ الآن.':`${arabic(target)} قصّة تكشف سؤال الأسبوع للجميع. باقي صفحات ابتكر متاحة لك.`):opening?'أهلًا في ابتكر. الفكرة القادمة تبدأ منك.':'شريط واحد، وبداية نصنعها معًا. قصّة منك، ونفتح ابتكر للجميع.'}</p>
       </div>
       <div className={`opening-stage${count>0?' ribbon-touched':''}`} aria-label="شريط افتتاح ابتكر">
         <div className="opening-ribbon" aria-hidden="true">

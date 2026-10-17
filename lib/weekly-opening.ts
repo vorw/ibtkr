@@ -1,10 +1,13 @@
 import { readOpening, type OpeningState } from '@/lib/opening';
-import { weeklyRibbonFor } from './weekly-ribbon-policy';
+import { weeklyRibbonFor,weeklyRibbonTarget } from './weekly-ribbon-policy';
 import type { WeeklyChallenge } from './weekly';
 async function ensure(db:D1Database,week:WeeklyChallenge){
   const event=weeklyRibbonFor(week);if(!event)return null;
   await readOpening(db,null);
-  await db.prepare('INSERT OR IGNORE INTO opening_events (id,target) VALUES (?,?)').bind(event.id,event.target).run();return event;
+  await db.batch([
+    db.prepare('INSERT OR IGNORE INTO opening_events (id,target) VALUES (?,?)').bind(event.id,event.target),
+    db.prepare('UPDATE opening_events SET target=? WHERE id=? AND target<>?').bind(event.target,event.id,event.target),
+  ]);return event;
 }
 export async function weeklyVisitor(db:D1Database,week:WeeklyChallenge,value:string|null,create=false):Promise<string|null>{
   const event=await ensure(db,week);if(!event)return null;
@@ -16,7 +19,7 @@ export async function weeklyVisitor(db:D1Database,week:WeeklyChallenge,value:str
 }
 export async function readWeeklyOpening(db:D1Database,week:WeeklyChallenge,visitor:string|null=null):Promise<OpeningState>{
   const event=await ensure(db,week);
-  if(!event)return {eventId:week.id,target:10,count:0,isOpen:true,canCut:false,hasCut:false,position:null,openedAt:null};
+  if(!event)return {eventId:week.id,target:weeklyRibbonTarget,count:0,isOpen:true,canCut:false,hasCut:false,position:null,openedAt:null};
   const row=await db.prepare(`SELECT e.target,e.opened_at,
     (SELECT COUNT(*) FROM opening_cuts WHERE event_id=e.id) count,
     (SELECT COUNT(*) FROM opening_cuts WHERE event_id=e.id AND user_id=?) own,
@@ -34,4 +37,4 @@ export async function cutWeeklyOpening(db:D1Database,week:WeeklyChallenge,visito
     db.prepare(`UPDATE opening_events SET opened_at=? WHERE id=? AND opened_at IS NULL AND (SELECT COUNT(*) FROM opening_cuts WHERE event_id=opening_events.id)>=target`).bind(time,event.id),
   ]);return readWeeklyOpening(db,week,visitor);
 }
-export function concealWeeklyQuestion(week:WeeklyChallenge){return {...week,title:'تحدّي الأسبوع… نفتحه معًا.',short:'عشر قصّات تكشف التحدّي للجميع.',description:'',angles:[]};}
+export function concealWeeklyQuestion(week:WeeklyChallenge){return {...week,title:'تحدّي الأسبوع… نفتحه معًا.',short:'قصّاتكم تكشف التحدّي للجميع.',description:'',angles:[]};}

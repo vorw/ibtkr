@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     if(!(await readOpening(db,user.userId)).isOpen)return reply({error:'المشاركة تفتح بعد اكتمال الافتتاح.'},423);
     if(value.action==='idea'||value.action==='edit'){
       const current=currentChallenge();
-      if(current&&!(await readWeeklyOpening(db,current)).isOpen)return reply({error:'سؤال الأسبوع ينتظر عشر قصّات لفتحه للجميع.'},423);
+      if(current&&!(await readWeeklyOpening(db,current)).isOpen)return reply({error:'سؤال الأسبوع ينتظر اكتمال قصّ الشريط لفتحه للجميع.'},423);
     }
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);

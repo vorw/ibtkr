@@ -352,7 +352,7 @@ export default function InnovationApp() {
   }
   function start(challenge: Challenge, idea?: Idea, angleId=angle?.id) {
     if(currentChallenge()?.id!==challenge.id){toast.error('أُغلق هذا التحدّي. انتظر تحدّي الأسبوع القادم.');return;}
-    if(mission?.id===challenge.id&&!mission.angles.length){changeTab('home');toast('نفتح سؤال الأسبوع معًا بعد عشر قصّات.');return;}
+    if(mission?.id===challenge.id&&!mission.angles.length){changeTab('home');toast('نفتح سؤال الأسبوع معًا بعد اكتمال قصّ الشريط.');return;}
     const chosen = challenge.angles.find(item => item.id === (idea?.angle_id ?? angleId));
     if (!chosen) { chooseAngle(); return; }
     angleId = chosen.id;
