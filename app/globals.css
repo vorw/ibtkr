@@ -473,6 +473,12 @@ body, .site-header, .mission-hero, .player-panel, .achievement-panel, .profile-n
   font-variant-numeric: tabular-nums;
 }
 .weekly-layout .mission-topline { align-items: center; }
+/* On side-by-side screens the angle card follows its content, not the hero's
+   height. Keep the existing stacked/tablet/phone layout unchanged. */
+@media (min-width: 901px) {
+  .weekly-layout .command-stack { align-self: start; }
+  .weekly-layout .mission-selector { flex: 0 0 auto; }
+}
 @media (max-width: 760px) {
   .week-number { min-width: 42px; min-height: 38px; font-size: 1.25rem; }
 }

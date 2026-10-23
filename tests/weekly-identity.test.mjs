@@ -25,3 +25,12 @@ test('the short leader link renders the same unlisted preview without affecting 
   assert.match(alias,/<SketchPreview\/>/);assert.match(alias,/index:false,follow:false/);
   assert.doesNotMatch(read('app/page.tsx'),/SketchPreview|ink-7q/);
 });
+test('desktop angle cards fit their content without changing the stacked mobile layout',()=>{
+  const css=read('app/globals.css');
+  assert.match(css,/@media \(min-width: 901px\)\s*\{\s*\.weekly-layout \.command-stack\s*\{ align-self: start; \}\s*\.weekly-layout \.mission-selector\s*\{ flex: 0 0 auto; \}/);
+});
+test('the cup illustration has no detached callout arrow',()=>{
+  const view=read('app/weekly-challenge-view.tsx');
+  assert.ok(view.includes('M42 25l9 78'));assert.ok(view.includes('M66 5l-3-6m20 4v-8'));
+  assert.equal(view.includes('M129 21l29-10'),false);
+});
