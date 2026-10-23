@@ -22,7 +22,9 @@ beforeEach(async()=>{
 afterEach(()=>mock.timers.reset());after(()=>state.db?.close());
 test('drawing round replaces only week 03, keeps dates, unique tracks and the usual leaderboard',()=>{
   assert.equal(week.number,'03');assert.equal(week.startsAt,'2026-10-23T21:00:00.000Z');assert.equal(week.endsAt,'2026-10-30T21:00:00.000Z');assert.equal(week.submission,'drawing');
-  assert.deepEqual(week.angles.map(a=>a.label),['ما ينكب','ينحمل بسهولة','أكثر من كوب']);assert.equal(angleLabel('change',week.id),'ما ينكب');
+  assert.equal(week.title,'لمبة ولعت… فهمتها؟');assert.equal(week.drawingTheme,'warning-symbols');
+  assert.deepEqual(week.angles.map(a=>a.id),['change','reverse','what-if']);
+  assert.deepEqual(week.angles.map(a=>a.label),['تحذير الفرامل','ضغط الإطارات','فحص المحرك']);assert.equal(angleLabel('change',week.id),'تحذير الفرامل');
   assert.equal(weeklyChallenges[1].title,'جرّبها… قبل ما تشتريها.');assert.equal(weeklyChallenges[1].submission,undefined);assert.equal(weeklyChallenges[3].submission,undefined);
 });
 test('raster validation rejects SVG, spoofed data, oversized bytes and oversized dimensions',()=>{

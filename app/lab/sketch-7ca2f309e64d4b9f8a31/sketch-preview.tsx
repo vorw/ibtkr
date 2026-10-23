@@ -4,7 +4,7 @@ import { ArrowUpLeft,Lightbulb,Users,X } from 'lucide-react';
 import DrawingStudio from '../../drawing-studio';
 import WeeklyChallengeView from '../../weekly-challenge-view';
 import { ThemeToggle } from '../../theme-toggle';
-import { weeklyChallenges,type WeeklyChallenge } from '@/lib/weekly';
+import { weeklyChallenges,cupPreviewContent,type WeeklyChallenge } from '@/lib/weekly';
 import { Tabs,TabsList,TabsTrigger } from '@/components/ui/tabs';
 import { Dialog,DialogClose,DialogContent,DialogDescription,DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import './sketch-preview.css';
 
 const navigation=[{id:'home',label:'تحدّي الأسبوع'},{id:'ideas',label:'المجتمع'},{id:'leaderboard',label:'المتصدرون'},{id:'profile',label:'رحلتك'}];
 type PreviewProps={mission?:WeeklyChallenge;drawingHero?:ReactNode;angleVisuals?:ReactNode[];notice?:string;captionPlaceholder?:string;selectionKind?:'angle'|'symbol'};
-export default function SketchPreview({mission=weeklyChallenges[2],drawingHero,angleVisuals,notice='معاينة الأسبوع 03 · بدون نشر أو قصّ الشريط',captionPlaceholder='كيف يشتغل تعديلك؟',selectionKind='angle'}:PreviewProps){
+export default function SketchPreview({mission={...weeklyChallenges[2],...cupPreviewContent,id:'preview-cup'},drawingHero,angleVisuals,notice='معاينة الأسبوع 03 · بدون نشر أو قصّ الشريط',captionPlaceholder='كيف يشتغل تعديلك؟',selectionKind}:PreviewProps){
   const [drawing,setDrawing]=useState(''),[caption,setCaption]=useState(''),[angleIndex,setAngleIndex]=useState<number|null>(null),[dialog,setDialog]=useState(false),[preview,setPreview]=useState(false),[working,setWorking]=useState(false),[tick,setTick]=useState(0);
   const week=mission,angle=angleIndex===null?undefined:week.angles[angleIndex];
   useEffect(()=>{setTick(Date.now());const timer=setInterval(()=>setTick(Date.now()),30000);return()=>clearInterval(timer);},[]);
@@ -50,7 +50,7 @@ export default function SketchPreview({mission=weeklyChallenges[2],drawingHero,a
       <DialogTitle className="dialog-title">خلّ فكرتك تنرسم.</DialogTitle>
       <DialogDescription className="dialog-description">رسمة واحدة. فكرة مختلفة.</DialogDescription>
       {preview?<div className="weekly-preview-result"><img src={drawing} alt="معاينة رسمتك"/><p>{caption}</p><Button className="outline-button" onClick={()=>setPreview(false)}>ارجع للرسم</Button></div>:<form className="idea-form" onSubmit={showPreview}>
-        <div className="form-field"><label htmlFor="preview-angle">{selectionKind==='symbol'?'الرمز المختار':'زاوية الحل'}</label><NativeSelect id="preview-angle" value={angle?.id??''} onChange={event=>setAngleIndex(week.angles.findIndex(item=>item.id===event.target.value))}>{week.angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect><p className="compose-prompt">{angle?.prompt}</p></div>
+        <div className="form-field"><label htmlFor="preview-angle">{week.drawingTheme==='warning-symbols'||selectionKind==='symbol'?'الرمز المختار':'زاوية الحل'}</label><NativeSelect id="preview-angle" value={angle?.id??''} onChange={event=>setAngleIndex(week.angles.findIndex(item=>item.id===event.target.value))}>{week.angles.map(item=><NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect><p className="compose-prompt">{angle?.prompt}</p></div>
         <DrawingStudio value={drawing} onChange={setDrawing} onBusyChange={setWorking}/>
         <div className="form-field"><label htmlFor="preview-caption">فكرتك بجملة</label><Textarea id="preview-caption" maxLength={180} minLength={2} required rows={2} value={caption} placeholder={captionPlaceholder} onChange={event=>setCaption(event.target.value)}/></div>
         <div className="form-helper"><span>تجربة فقط؛ لا تُحفظ في المجتمع.</span><span dir="ltr">{caption.length} / 180</span></div>

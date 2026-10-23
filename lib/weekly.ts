@@ -1,6 +1,26 @@
 import { preparedChallenges } from './weekly-content';
 export type Angle = { id: string; label: string; prompt: string; hint: string; icon: 'shuffle' | 'flip' | 'people' };
-export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[]; submission?: 'drawing' };
+export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[]; submission?: 'drawing'; drawingTheme?: 'warning-symbols' };
+
+// Retain the original comparison preview independently of the scheduled round.
+export const cupPreviewContent={
+  category:'تحدّي الرسم',title:'كوب… بس مو أي كوب.',short:'ارسم تعديلًا ذكيًا على كوبك، واشرحه بجملة.',description:'كوبك معك في طريق الجامعة. كيف تخليه أذكى؟ اختر زاوية وارسم فكرتك.',submission:'drawing' as const,drawingTheme:undefined,
+  angles:[
+    {id:'change',label:'ما ينكب',icon:'shuffle' as const,prompt:'ارسم طريقة تمنع الانسكاب وتبقي الشرب سهلًا.',hint:'فكّر في الغطاء أو شكل الكوب. سهم واحد يوضّح فكرتك.'},
+    {id:'reverse',label:'ينحمل بسهولة',icon:'flip' as const,prompt:'يدك مشغولة بالجوال أو الشنطة. كيف تحمل كوبك؟',hint:'ارسم كيف تمسكه أو تثبّته، بدون ما يعطّل حركتك.'},
+    {id:'what-if',label:'أكثر من كوب',icon:'people' as const,prompt:'أضف للكوب وظيفة ثانية مفيدة، ووضّحها بالرسم.',hint:'وظيفة تخدم يومك، مو مجرد زينة.'},
+  ],
+};
+export const warningChallengeContent={
+  category:'تحدّي الرسم',title:'لمبة ولعت… فهمتها؟',short:'أعد رسم رمز من طبلون السيارة ليُفهم من أول نظرة.',
+  description:'رمز صغير، ومعنى مو واضح. اختر تنبيهًا من طبلون السيارة وأعد رسم رمزه ليُفهم من أول نظرة، بدون كلمات.',submission:'drawing' as const,drawingTheme:'warning-symbols' as const,
+  // Keep the round's existing angle identifiers for drafts, filters and entries.
+  angles:[
+    {id:'change',label:'تحذير الفرامل',icon:'shuffle' as const,prompt:'أعد رسم رمز تحذير الفرامل بحيث يوضّح أن التنبيه يخص نظام الفرامل، بدون كلمات.',hint:'كيف توضح الفرامل نفسها، بدل الاكتفاء بعلامة تعجّب؟'},
+    {id:'reverse',label:'ضغط الإطارات',icon:'flip' as const,prompt:'أعد رسم رمز انخفاض ضغط الإطارات ليُفهم أن الهواء داخل أحد الإطارات أقل من المطلوب.',hint:'وضّح نقص الضغط، لا مجرد وجود إطار.'},
+    {id:'what-if',label:'فحص المحرك',icon:'people' as const,prompt:'أعد رسم رمز فحص المحرك ليُفهم أن المحرك أو نظام الانبعاثات يحتاج فحصًا.',hint:'الرمز يطلب فحصًا؛ لا يفترض أن المحرك تعطّل تمامًا.'},
+  ],
+};
 
 // The public launch begins Saturday October 10 at 00:00 Riyadh.
 // All twenty weeks close Saturday 00:00 (Friday 21:00 UTC), so voting stays
@@ -38,15 +58,9 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     {id:'what-if',label:'ماذا لو؟',icon:'people'},
   ];
   const drawing=index===0;
-  const sketchContent={category:'تحدّي الرسم',title:'كوب… بس مو أي كوب.',short:'ارسم تعديلًا ذكيًا على كوبك، واشرحه بجملة.',description:'كوبك معك في طريق الجامعة. كيف تخليه أذكى؟ اختر زاوية وارسم فكرتك.',submission:'drawing' as const};
-  const sketchAngles=[
-    {id:'change',label:'ما ينكب',icon:'shuffle' as const,prompt:'ارسم طريقة تمنع الانسكاب وتبقي الشرب سهلًا.',hint:'فكّر في الغطاء أو شكل الكوب. سهم واحد يوضّح فكرتك.'},
-    {id:'reverse',label:'ينحمل بسهولة',icon:'flip' as const,prompt:'يدك مشغولة بالجوال أو الشنطة. كيف تحمل كوبك؟',hint:'ارسم كيف تمسكه أو تثبّته، بدون ما يعطّل حركتك.'},
-    {id:'what-if',label:'أكثر من كوب',icon:'people' as const,prompt:'أضف للكوب وظيفة ثانية مفيدة، ووضّحها بالرسم.',hint:'وظيفة تخدم يومك، مو مجرد زينة.'},
-  ];
-  return {...content,...(drawing?sketchContent:{}),id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
+  return {...content,...(drawing?warningChallengeContent:{}),id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
     startsAt:new Date(start).toISOString(),endsAt:new Date(start+7*86400000).toISOString(),
-    angles:drawing?sketchAngles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
+    angles:drawing?warningChallengeContent.angles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
 })];
 
 export function currentChallenge(now = new Date()): WeeklyChallenge | null {
