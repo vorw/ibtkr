@@ -7,8 +7,9 @@ eligibility are unchanged. The weekly question ribbon requires five distinct
 visitor cuts; earlier cuts and opening timestamps are preserved. An unopened
 event with enough existing cuts opens automatically on its next read.
 
-The unlisted leader preview is available at `/ink-7q`; its original lab link
-also remains valid. Neither link is password-protected or listed in navigation.
+The unlisted leader preview is available at `/drawing-preview`. The earlier
+`/ink-7q` address redirects there, and the original lab link remains valid.
+These previews are not password-protected or listed in navigation.
 
 - One JPEG attachment and a 2–180 character caption; the caption supplies the
   internal title. Drawing directly and uploading share the same submission path.

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import SketchPreview from '../lab/sketch-7ca2f309e64d4b9f8a31/sketch-preview';
+import { permanentRedirect } from 'next/navigation';
 
-// A memorable, unlisted share link; the original lab URL remains valid too.
+// Preserve previously shared links while using the requested preview address.
 export const metadata:Metadata={title:'مساحة الرسم | ابتكر',robots:{index:false,follow:false},referrer:'no-referrer'};
-export default function Page(){return <SketchPreview/>;}
+export default function Page(){permanentRedirect('/drawing-preview');}

@@ -20,10 +20,10 @@ test('the removed reassurance does not appear in any application or challenge so
   check('app');check('lib');
 });
 test('the short leader link renders the same unlisted preview without affecting the public homepage',()=>{
-  const alias=read('app/ink-7q/page.tsx');
+  const alias=read('app/drawing-preview/page.tsx');
   assert.match(alias,/import SketchPreview from '\.\.\/lab\/sketch-7ca2f309e64d4b9f8a31\/sketch-preview'/);
   assert.match(alias,/<SketchPreview\/>/);assert.match(alias,/index:false,follow:false/);
-  assert.doesNotMatch(read('app/page.tsx'),/SketchPreview|ink-7q/);
+  assert.doesNotMatch(read('app/page.tsx'),/SketchPreview|drawing-preview/);
 });
 test('desktop angle cards fit their content without changing the stacked mobile layout',()=>{
   const css=read('app/globals.css');
