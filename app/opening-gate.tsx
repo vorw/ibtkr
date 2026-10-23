@@ -120,6 +120,7 @@ export default function OpeningGate({children,preview=false,weekId,onOpen}:{chil
 
   if(entered)return <SitePreviewContext.Provider value={sitePreview}>{children}</SitePreviewContext.Provider>;
   const count=state?.count??0,target=state?.target??(preview?2:weekId?weeklyRibbonTarget:10);
+  const cutWord=target>=3&&target<=10?'قصّات':'قصّة';
   const cutX=10+((Math.min(count,target-1)+1)/(target+1))*80;
   const style={'--cut-y':`${drag}px`,'--cut-x':`${cutX}%`,'--drag-energy':drag/180,'--burst-x':`${10+count/(target+1)*80}%`} as CSSProperties;
   const MainTag=weekId?'section':'main';
@@ -135,7 +136,7 @@ export default function OpeningGate({children,preview=false,weekId,onOpen}:{chil
     <MainTag className="opening-main" id={weekId?'weekly-opening-content':'main-content'} aria-label={weekId?'افتتاح تحدّي الأسبوع':undefined}>
       <div className="opening-copy"><span className="opening-eyebrow">قصّة صغيرة. بداية كبيرة.</span>
         <h1>{opening?<>فتحناها<span>معًا.</span></>:<>البداية<span>بأيديكم.</span></>}</h1>
-        <p>{weekId?(opening?'تحدّي الأسبوع انفتح. فكرتك تبدأ الآن.':`${arabic(target)} قصّة تكشف سؤال الأسبوع للجميع. باقي صفحات ابتكر متاحة لك.`):opening?'أهلًا في ابتكر. الفكرة القادمة تبدأ منك.':'شريط واحد، وبداية نصنعها معًا. قصّة منك، ونفتح ابتكر للجميع.'}</p>
+        <p>{weekId?(opening?'تحدّي الأسبوع انفتح. فكرتك تبدأ الآن.':`${arabic(target)} ${cutWord} تكشف سؤال الأسبوع للجميع. باقي صفحات ابتكر متاحة لك.`):opening?'أهلًا في ابتكر. الفكرة القادمة تبدأ منك.':'شريط واحد، وبداية نصنعها معًا. قصّة منك، ونفتح ابتكر للجميع.'}</p>
       </div>
       <div className={`opening-stage${count>0?' ribbon-touched':''}`} aria-label="شريط افتتاح ابتكر">
         <div className="opening-ribbon" aria-hidden="true">
@@ -154,7 +155,7 @@ export default function OpeningGate({children,preview=false,weekId,onOpen}:{chil
         {state?.hasCut&&!opening&&<div className="opening-cut-thanks"><span><Check size={25}/></span><strong>قصّتك صارت جزءًا من البداية.</strong><small>قصّتك رقم {arabic(state.position??count)} من {arabic(target)}. باقي {arabic(Math.max(0,target-count))} ونفتحها معًا.</small>{preview&&<button className="opening-accessible-cut opening-preview-next" onClick={()=>setState(current=>current?{...current,hasCut:false,canCut:true}:current)}>جرّب القصّة الثانية كمشارك آخر <ArrowUpLeft size={14}/></button>}</div>}
       </div>
       <section className="opening-participation" aria-label="تقدم الافتتاح" aria-live="polite">
-        <div className={`opening-tally${target>3?' opening-tally-many':''}`}><span key={count} className="opening-tally-number" dir="ltr">{arabic(count)}<span>/</span>{arabic(target)}</span><div><strong>{opening?'فتحناها معًا.':count?'قصّاتكم تقرّبنا.':'ابدأ أول قصّة.'}</strong><p>{opening?'حياك في مساحة الأفكار.':`نحتاج ${arabic(target)} قصّة لنفتح ${weekId?'تحدّي الأسبوع':'ابتكر'} للجميع.`}</p></div><div className="opening-dots" aria-hidden="true">{Array.from({length:target},(_,i)=><span key={i} className={i<count?'cut':''}>{i<count?<Check size={14}/>:arabic(i+1)}</span>)}</div></div>
+        <div className={`opening-tally${target>3?' opening-tally-many':''}`}><span key={count} className="opening-tally-number" dir="ltr">{arabic(count)}<span>/</span>{arabic(target)}</span><div><strong>{opening?'فتحناها معًا.':count?'قصّاتكم تقرّبنا.':'ابدأ أول قصّة.'}</strong><p>{opening?'حياك في مساحة الأفكار.':`نحتاج ${arabic(target)} ${cutWord} لنفتح ${weekId?'تحدّي الأسبوع':'ابتكر'} للجميع.`}</p></div><div className="opening-dots" aria-hidden="true">{Array.from({length:target},(_,i)=><span key={i} className={i<count?'cut':''}>{i<count?<Check size={14}/>:arabic(i+1)}</span>)}</div></div>
         {!state&&!error&&<p className="opening-connection" role="status">نجهّز لحظة البداية…</p>}
 
         {canCut&&<p className="opening-guest-note">الافتتاح للجميع، بدون تسجيل دخول. قصّة واحدة لكل متصفح.</p>}
