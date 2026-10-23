@@ -19,3 +19,9 @@ test('the removed reassurance does not appear in any application or challenge so
   function check(directory){for(const entry of readdirSync(new URL('../'+directory,import.meta.url),{withFileTypes:true})){const path=directory+'/'+entry.name;if(entry.isDirectory())check(path);else if(/\.(tsx?|css)$/.test(entry.name))assert.equal(read(path).includes(removed),false,path);}}
   check('app');check('lib');
 });
+test('the short leader link renders the same unlisted preview without affecting the public homepage',()=>{
+  const alias=read('app/ink-7q/page.tsx');
+  assert.match(alias,/import SketchPreview from '\.\.\/lab\/sketch-7ca2f309e64d4b9f8a31\/sketch-preview'/);
+  assert.match(alias,/<SketchPreview\/>/);assert.match(alias,/index:false,follow:false/);
+  assert.doesNotMatch(read('app/page.tsx'),/SketchPreview|ink-7q/);
+});

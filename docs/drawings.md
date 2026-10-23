@@ -2,8 +2,13 @@
 
 Week 03 (`week-2026-10-28`) is the cup sketch round. Its unchanged window is
 2026-10-23 21:00 UTC through 2026-10-30 21:00 UTC (Saturday midnight Riyadh).
-Other weeks retain text submissions. Voting, frozen results, ribbon cuts and
-winner email eligibility are unchanged.
+Other weeks retain text submissions. Voting, frozen results and winner email
+eligibility are unchanged. The weekly question ribbon requires five distinct
+visitor cuts; earlier cuts and opening timestamps are preserved. An unopened
+event with enough existing cuts opens automatically on its next read.
+
+The unlisted leader preview is available at `/ink-7q`; its original lab link
+also remains valid. Neither link is password-protected or listed in navigation.
 
 - One JPEG attachment and a 2–180 character caption; the caption supplies the
   internal title. Drawing directly and uploading share the same submission path.

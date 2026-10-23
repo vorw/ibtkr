@@ -7,6 +7,9 @@ async function ensure(db:D1Database,week:WeeklyChallenge){
   await db.batch([
     db.prepare('INSERT OR IGNORE INTO opening_events (id,target) VALUES (?,?)').bind(event.id,event.target),
     db.prepare('UPDATE opening_events SET target=? WHERE id=? AND target<>?').bind(event.target,event.id,event.target),
+    // Lowering the target must reveal a question that has already earned enough
+    // cuts. Preserve every cut and never replace an existing opening timestamp.
+    db.prepare(`UPDATE opening_events SET opened_at=? WHERE id=? AND opened_at IS NULL AND (SELECT COUNT(*) FROM opening_cuts WHERE event_id=opening_events.id)>=target`).bind(new Date().toISOString(),event.id),
   ]);return event;
 }
 export async function weeklyVisitor(db:D1Database,week:WeeklyChallenge,value:string|null,create=false):Promise<string|null>{

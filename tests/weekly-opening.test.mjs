@@ -25,21 +25,21 @@ test('guest cookie is private, repeat cuts count once, and a new week gets a fre
   assert.equal(await weeklyVisitor(db,weeklyChallenges[2],cookie.split('=')[1]),null);
   assert.equal(state.db.prepare('SELECT COUNT(*) n FROM profiles').get().n,0);
 });
-test('forty concurrent visitors open exactly at twenty; later arrivals remain open without contributing',async()=>{
+test('forty concurrent visitors open exactly at five; later arrivals remain open without contributing',async()=>{
   const db=database();const ids=await Promise.all(Array.from({length:40},()=>weeklyVisitor(db,week,null,true)));
   await Promise.all(ids.map(id=>cutWeeklyOpening(db,week,id)));
-  const result=await readWeeklyOpening(db,week);assert.equal(result.count,20);assert.equal(result.target,20);assert.equal(result.isOpen,true);
+  const result=await readWeeklyOpening(db,week);assert.equal(result.count,5);assert.equal(result.target,5);assert.equal(result.isOpen,true);
   const response=await api.GET(new Request(url));assert.equal(response.headers.get('set-cookie'),null);
-  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts WHERE event_id=?').get(result.eventId).n,20);
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts WHERE event_id=?').get(result.eventId).n,5);
 });
-test('leaderboard and profiles stay accessible while question details and submissions wait for twenty cuts',async()=>{
+test('leaderboard and profiles stay accessible while question details and submissions wait for five cuts',async()=>{
   const response=await community.GET(new Request('https://ibtkr.space/api/community'));assert.equal(response.status,200);
   const result=await response.json();assert.equal(result.weekly.ribbonOpen,false);assert.equal(result.weekly.current.id,week.id);assert.equal(result.weekly.current.description,'');assert.deepEqual(result.weekly.current.angles,[]);
   assert.equal(result.weekly.weeks.find(w=>w.number==='01').title,'إلغاء الاشتراك… بدون دوّامة.');
   state.user='alice';const req=body=>new Request('https://ibtkr.space/api/community',{method:'POST',headers:{Origin:'https://ibtkr.space'},body:JSON.stringify(body)});
   assert.equal((await community.POST(req({action:'profile',displayName:'سالم'}))).status,200);
   assert.equal((await community.POST(req({action:'idea',id:crypto.randomUUID(),challengeId:week.id,angleId:'change',title:'فكرة',body:'وصف فكرة كامل للتجربة الجديدة.'}))).status,423);
-  const db=database();for(let i=0;i<20;i++)await cutWeeklyOpening(db,week,await weeklyVisitor(db,week,null,true));
+  const db=database();for(let i=0;i<5;i++)await cutWeeklyOpening(db,week,await weeklyVisitor(db,week,null,true));
   const opened=await (await community.GET(new Request('https://ibtkr.space/api/community'))).json();assert.equal(opened.weekly.ribbonOpen,true);assert.equal(opened.weekly.current.title,week.title);assert.equal(opened.weekly.current.angles.length,3);
 });
 test('old week requests and cross-site cuts cannot affect the current ribbon',async()=>{
@@ -49,12 +49,12 @@ test('old week requests and cross-site cuts cannot affect the current ribbon',as
   assert.equal((await readWeeklyOpening(database(),week)).count,0);
 });
 
-test('raising an existing target preserves cuts and requires the twentieth distinct visitor',async()=>{
+test('lowering an existing target preserves three cuts and still requires the fifth distinct visitor',async()=>{
   const db=database(),event='ibtkr-weekly-ribbon-'+week.id;
-  state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run(event,10,null);
+  state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run(event,20,null);
   for(let i=0;i<3;i++)state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run(event,'earlier-'+i,week.startsAt);
-  const updated=await readWeeklyOpening(db,week);assert.equal(updated.target,20);assert.equal(updated.count,3);assert.equal(updated.isOpen,false);
-  for(let i=0;i<16;i++)await cutWeeklyOpening(db,week,await weeklyVisitor(db,week,null,true));
+  const updated=await readWeeklyOpening(db,week);assert.equal(updated.target,5);assert.equal(updated.count,3);assert.equal(updated.isOpen,false);
+  await cutWeeklyOpening(db,week,await weeklyVisitor(db,week,null,true));
   assert.equal((await readWeeklyOpening(db,week)).isOpen,false);
   assert.equal((await cutWeeklyOpening(db,week,await weeklyVisitor(db,week,null,true))).isOpen,true);
 });
@@ -62,5 +62,16 @@ test('raising an existing target preserves cuts and requires the twentieth disti
 test('a previously opened question retains its opening timestamp when its target changes',async()=>{
   const event='ibtkr-weekly-ribbon-'+week.id;
   state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run(event,10,week.startsAt);
-  const updated=await readWeeklyOpening(database(),week);assert.equal(updated.target,20);assert.equal(updated.isOpen,true);assert.equal(updated.openedAt,week.startsAt);
+  const updated=await readWeeklyOpening(database(),week);assert.equal(updated.target,5);assert.equal(updated.isOpen,true);assert.equal(updated.openedAt,week.startsAt);
+});
+
+test('an unopened event with at least five earlier cuts opens on read without losing or adding cuts',async()=>{
+  const db=database(),event='ibtkr-weekly-ribbon-'+week.id;
+  state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run(event,20,null);
+  for(let i=0;i<7;i++)state.db.prepare('INSERT INTO opening_cuts VALUES (?,?,?)').run(event,'earlier-'+i,week.startsAt);
+  const updated=await readWeeklyOpening(db,week);assert.equal(updated.target,5);assert.equal(updated.count,7);assert.equal(updated.isOpen,true);assert.equal(updated.openedAt,week.startsAt);
+  mock.timers.tick(60000);
+  const response=await api.GET(new Request(url));assert.equal(response.headers.get('set-cookie'),null);
+  const repeated=await response.json();assert.equal(repeated.count,7);assert.equal(repeated.openedAt,week.startsAt);
+  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_visitors WHERE event_id=?').get(event).n,0);
 });

@@ -68,6 +68,6 @@
 .weekly-opening .opening-main{padding-top:0}
 .weekly-opening .opening-copy h1{font-size:clamp(42px,6vw,68px)}
 .weekly-opening .opening-stage{height:330px;width:100%}
-.weekly-opening .opening-dots{grid-template-columns:repeat(10,minmax(0,1fr))}
+.weekly-opening .opening-dots{grid-template-columns:repeat(5,minmax(0,1fr))}
 .weekly-opening .opening-participation{margin-bottom:30px}
 .weekly-opening.is-opening{animation:none}
