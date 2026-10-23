@@ -3,10 +3,11 @@
 import OpeningGate, { SitePreviewContext } from './opening-gate';
 import { weeklyRibbonFor } from '@/lib/weekly-ribbon-policy';
 import DrawingStudio, { DrawingImage,readDrawing } from './drawing-studio';
+import WeeklyChallengeView from './weekly-challenge-view';
 
-import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode, type PointerEvent } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { ArrowLeft, ArrowUpLeft, Check, ChevronLeft, ChevronRight, Heart, Lightbulb, MessageCircle, Pencil, Plus, RotateCcw, Shuffle, Sparkles, Users, Trophy, Search, Clock3, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpLeft, Check, ChevronLeft, ChevronRight, Heart, Lightbulb, MessageCircle, Pencil, Plus, Sparkles, Users, Trophy, Search, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,6 @@ import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/p
 const initial: AppData = { signedIn: false, ideas: [], progress: { xp: 0, ideas: 0, reviews: 0 }, profile: null, weekly:{current:null,selected:null,weeks:[],status:'waiting',serverNow:'',ownEntries:0,ownLikes:0,leaders:[],leaderTotal:0,leaderPage:1,finalized:false},pagination:{page:1,pageSize:12,total:0,pages:1} };
 type Draft = IdeaDraft;
 class SignInRequired extends Error {}
-const icons = { shuffle: Shuffle, flip: RotateCcw, people: Users };
 const palette = ['violet', 'acid', 'signal'] as const;
 function WeeklyChallengeGate({week,isOpen,onOpen,children}:{week:Challenge|null;isOpen:boolean|undefined;onOpen:()=>void;children:ReactNode}){
   // Remember only a ceremony this mounted page actually waited for. That lets
@@ -188,7 +188,6 @@ export default function InnovationApp() {
   const active = data.focusedIdea?.id===selected ? data.focusedIdea : openedIdea?.id===selected?openedIdea: data.ideas.find((idea) => idea.id === selected);
   const mission = data.weekly.current ?? (loading ? currentChallenge() : null);
   const angle=missionIndex === null ? undefined : mission?.angles[missionIndex];
-  const headline=mission?.title.match(/^(.*?[؟…])\s*(.*)$/);
   const feed=data.ideas;
   const remaining=mission?Math.max(0,new Date(mission.endsAt).getTime()-tick):0;
   const timeLeft=remaining>0 ? `${Math.floor(remaining/86400000)} يوم · ${Math.floor(remaining/3600000)%24} ساعة · ${Math.floor(remaining/60000)%60} دقيقة` : 'أُغلق التحدّي';
@@ -468,12 +467,6 @@ export default function InnovationApp() {
     } catch (caught) { toast.error(caught instanceof Error ? caught.message : 'تعذّر تسجيل الخروج.'); }
     finally { mutationLock.current = false; setBusy(false); }
   }
-  function moveSpotlight(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === 'touch' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const rectangle = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.style.setProperty('--spot-x', `${event.clientX - rectangle.left}px`);
-    event.currentTarget.style.setProperty('--spot-y', `${event.clientY - rectangle.top}px`);
-  }
 
   useEffect(() => {
     type ModelContext={registerTool:(tool:unknown,options:{signal:AbortSignal})=>unknown};
@@ -502,20 +495,7 @@ export default function InnovationApp() {
         <TabsContent value="home" className="page-stage">
           <WeeklyChallengeGate week={mission} isOpen={data.weekly.current?.id===mission?.id?data.weekly.ribbonOpen:undefined} onOpen={()=>{void refresh();}}>
           <div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>
-          {mission ? <section className="mission-layout weekly-layout" aria-label="تحدّي الأسبوع">
-            <article key={mission.id} className="mission-hero tone-violet" onPointerMove={moveSpotlight}>
-              <div className="hero-grid" aria-hidden="true"/>
-              <div className="mission-topline"><span className="week-marker"><span>الأسبوع</span><b className="week-number" dir="ltr">{mission.number}</b></span><span className="week-status"><Clock3 size={15}/> ينتهي الجمعة، ١١:٥٩ م</span></div>
-              <div className="mission-copy"><span className="mission-type">{mission.category}</span><h1>{headline ? <><span>{headline[1]}</span><span>{headline[2]}</span></> : mission.title}</h1><p>{mission.description}</p>{mission.submission==='drawing'&&<><div className="drawing-hero-art" aria-hidden="true"><svg viewBox="0 0 180 125" fill="none"><ellipse cx="78" cy="25" rx="36" ry="10" stroke="currentColor" strokeWidth="2" className="sketch-line"/><path d="M42 25l9 78q27 14 54 0l9-78M111 46h14c27 0 24 36-2 36h-15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="sketch-line"/><path d="M129 21l29-10m-8 0h8l-3 8M66 5l-3-6m20 4v-8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M54 109l-10 4m61-4 8 3" stroke="currentColor" opacity=".3"/></svg></div><div className="drawing-hero-note">ارسم هنا أو ارفع رسمتك · الفكرة أهم من جمالها</div></>}</div>
-              <div aria-live="polite">{angle ? <div className="selected-angle" key={angle.id}><span className={`angle-tag tone-${palette[mission.angles.indexOf(angle)]}`}>{angle.label}</span><p>{angle.prompt}</p></div> : <p className="angle-invitation">اختر زاوية من القائمة، وبيظهر سؤالها هنا.</p>}</div>
-              <div className="mission-controls"><Button className="launch-button" onClick={()=>start(mission)}>{angle ? mission.submission==='drawing'?'ارسم فكرتك':'شارك حلّك' : 'اختر زاويتك'}</Button></div>
-              <div className="mission-footer"><span>تحدّي جديد السبت، ١٢:٠٠ ص بتوقيت الرياض.</span><span className="weekly-countdown" aria-label="الوقت المتبقي">{timeLeft}</span></div>
-            </article>
-            <aside className="command-stack">
-              <section className="mission-selector"><div className="panel-top"><h2>من أي زاوية تبدأ؟</h2><span dir="ltr">01—03</span></div><div className="mission-options">{mission.angles.map((item,index)=>{const Icon=icons[item.icon];return <button key={item.id} className={`mission-option tone-${palette[index]}`} aria-pressed={missionIndex===index} onClick={()=>setMissionIndex(index)}><span className="option-number">0{index+1}</span><span className="option-copy"><strong>{item.label}</strong><small>{index===missionIndex?'زاويتك المختارة':angle?'نفس المشكلة، منظور مختلف':'اختر هالزاوية'}</small></span><Icon size={20} strokeWidth={1.5}/></button>})}</div><div className="angle-hint" key={angle?.id}><Lightbulb size={18}/><p>{angle?.hint ?? 'كل زاوية تفتح لك طريقة مختلفة للحل.'}</p></div></section>
-              <section className="weekly-score-panel"><Trophy size={23}/><div><small>{data.signedIn?'مشاركتك هذا الأسبوع':'مبتكر الأسبوع'}</small><strong>{data.signedIn?`${data.weekly.ownEntries} مشاركة · ${data.weekly.ownLikes} إعجاب`:'باختيار المجتمع'}</strong></div><button className="panel-link" onClick={()=>changeTab('leaderboard')}>شاهد المتصدرين</button></section>
-            </aside>
-          </section> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
+          {mission ? <WeeklyChallengeView mission={mission} missionIndex={missionIndex} onSelectAngle={setMissionIndex} onStart={()=>start(mission)} onLeaderboard={()=>changeTab('leaderboard')} timeLeft={timeLeft} signedIn={data.signedIn} ownEntries={data.weekly.ownEntries} ownLikes={data.weekly.ownLikes}/> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
           <Reveal className="community-preview section-block"><div className="section-heading"><div><span className="eyebrow">من المجتمع</span><h2>فكرة منك.<br/><span>وزاوية من غيرك.</span></h2></div><div className="section-aside"><p>اقرأ الحلول، ناقشها، وصوّت للفكرة اللي تلفتك.</p><button className="text-link" onClick={()=>{setWeekFilter('current');setAngleFilter('all');setSearch('');setPage(1);setFilter('all');changeTab('ideas')}}>شاهد المشاركات</button></div></div>{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas',...(findWeek(weekFilter)?{week:weekFilter}:{})})}/>:data.ideas.length?<div className="idea-grid">{ideaCards(data.ideas.slice(0,3))}</div>:<EmptyState onStart={()=>changeTab('home')}/>}</Reveal>
           </WeeklyChallengeGate>
         </TabsContent>

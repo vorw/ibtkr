@@ -80,7 +80,7 @@ export default function DrawingStudio({value,onChange,disabled=false,onBusyChang
       {value?<><img src={value} alt="معاينة رسمتك"/><div className="upload-actions"><button type="button" disabled={locked} onClick={()=>file.current?.click()}><Upload size={16}/> غيّر الصورة</button><button type="button" disabled={locked} onClick={()=>setMode('draw')}><Pencil size={16}/> ارسم عليها</button></div></>:<button className="upload-target" type="button" disabled={locked} onClick={()=>file.current?.click()}><span><ImagePlus size={30} strokeWidth={1.3}/></span><strong>رسمتك، بطريقتك.</strong><small>صورة ورقة أو رسم رقمي</small><b>اختر صورة <Upload size={16}/></b><small dir="ltr">JPG · PNG · WebP</small></button>}
     </div>}
     <input ref={file} type="file" accept="image/jpeg,image/png,image/webp" aria-label="اختر صورة رسمتك" hidden disabled={locked} onChange={event=>void upload(event.target.files?.[0])}/>
-    <div className="drawing-note"><span>{processing?'نجهّز رسمتك…':'الفكرة أهم من جمال الرسمة.'}</span><span>{value?<><Check size={13}/> الرسمة جاهزة</>:'خطوط بسيطة تكفي'}</span></div>
+    <div className="drawing-note"><span>{processing?'نجهّز رسمتك…':'الفكرة أهم من جمال الرسمة.'}</span>{value&&<span><Check size={13}/> الرسمة جاهزة</span>}</div>
     {error&&<p className="form-error" role="alert">{error}</p>}
   </section>;
 }

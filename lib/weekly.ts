@@ -38,7 +38,7 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     {id:'what-if',label:'ماذا لو؟',icon:'people'},
   ];
   const drawing=index===0;
-  const sketchContent={category:'تحدّي الرسم',title:'كوب… بس مو أي كوب.',short:'ارسم تعديلًا ذكيًا على كوبك، واشرحه بجملة.',description:'كوبك معك في طريق الجامعة. كيف تخليه أذكى؟ اختر زاوية وارسم فكرتك؛ خطوط بسيطة تكفي.',submission:'drawing' as const};
+  const sketchContent={category:'تحدّي الرسم',title:'كوب… بس مو أي كوب.',short:'ارسم تعديلًا ذكيًا على كوبك، واشرحه بجملة.',description:'كوبك معك في طريق الجامعة. كيف تخليه أذكى؟ اختر زاوية وارسم فكرتك.',submission:'drawing' as const};
   const sketchAngles=[
     {id:'change',label:'ما ينكب',icon:'shuffle' as const,prompt:'ارسم طريقة تمنع الانسكاب وتبقي الشرب سهلًا.',hint:'فكّر في الغطاء أو شكل الكوب. سهم واحد يوضّح فكرتك.'},
     {id:'reverse',label:'ينحمل بسهولة',icon:'flip' as const,prompt:'يدك مشغولة بالجوال أو الشنطة. كيف تحمل كوبك؟',hint:'ارسم كيف تمسكه أو تثبّته، بدون ما يعطّل حركتك.'},
