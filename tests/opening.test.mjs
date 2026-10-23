@@ -3,6 +3,7 @@ import { test,beforeEach,afterEach,after,mock } from 'node:test';
 import { registerHooks } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { state,resetDatabase,database } from './community-fixture.mjs';
+registerHooks({resolve(s,c,next){const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
 registerHooks({resolve(s,c,next){
   const aliases={'@/lib/auth-server':'./community-fixture.mjs','@/lib/database':'./community-fixture.mjs',
     '@/lib/weekly-opening':'../lib/weekly-opening.ts','./weekly-ribbon-policy':'../lib/weekly-ribbon-policy.ts',

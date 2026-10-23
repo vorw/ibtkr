@@ -30,11 +30,11 @@ export function signInHref(resume: Resume): string {
   return `/login?return_to=${encodeURIComponent(`/?${params}`)}`;
 }
 
-export type IdeaDraft = { id: string; title: string; body: string; angleId?: string };
+export type IdeaDraft = { id: string; title: string; body: string; angleId?: string; drawing?:string };
 export function readIdeaDraft(value: string | null): IdeaDraft | null {
   try {
     const draft = JSON.parse(value ?? 'null');
-    if (draft && uuid.test(draft.id) && ['title', 'body'].every(key => typeof draft[key] === 'string') && draft.title.length <= 100 && draft.body.length <= 2000) return { id: draft.id, title: draft.title, body: draft.body, ...(typeof draft.angleId === 'string' && ['change','reverse','what-if'].includes(draft.angleId) ? {angleId:draft.angleId} : {}) };
+    if (draft && uuid.test(draft.id) && ['title', 'body'].every(key => typeof draft[key] === 'string') && draft.title.length <= 100 && draft.body.length <= 2000) return { id: draft.id, title: draft.title, body: draft.body, ...(typeof draft.angleId === 'string' && ['change','reverse','what-if'].includes(draft.angleId) ? {angleId:draft.angleId} : {}),...(typeof draft.drawing==='string'&&draft.drawing.length<=240023&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(draft.drawing)?{drawing:draft.drawing}:{}) };
   } catch { /* An unavailable or outdated local draft must not block a new idea. */ }
   return null;
 }

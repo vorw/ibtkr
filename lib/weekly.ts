@@ -1,6 +1,6 @@
 import { preparedChallenges } from './weekly-content';
 export type Angle = { id: string; label: string; prompt: string; hint: string; icon: 'shuffle' | 'flip' | 'people' };
-export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[] };
+export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[]; submission?: 'drawing' };
 
 // The public launch begins Saturday October 10 at 00:00 Riyadh.
 // All twenty weeks close Saturday 00:00 (Friday 21:00 UTC), so voting stays
@@ -37,9 +37,16 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     {id:'reverse',label:'اقلب الفكرة',icon:'flip'},
     {id:'what-if',label:'ماذا لو؟',icon:'people'},
   ];
-  return {...content,id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
+  const drawing=index===0;
+  const sketchContent={category:'تحدّي الرسم',title:'كوب… بس مو أي كوب.',short:'ارسم تعديلًا ذكيًا على كوبك، واشرحه بجملة.',description:'كوبك معك في طريق الجامعة. كيف تخليه أذكى؟ اختر زاوية وارسم فكرتك؛ خطوط بسيطة تكفي.',submission:'drawing' as const};
+  const sketchAngles=[
+    {id:'change',label:'ما ينكب',icon:'shuffle' as const,prompt:'ارسم طريقة تمنع الانسكاب وتبقي الشرب سهلًا.',hint:'فكّر في الغطاء أو شكل الكوب. سهم واحد يوضّح فكرتك.'},
+    {id:'reverse',label:'ينحمل بسهولة',icon:'flip' as const,prompt:'يدك مشغولة بالجوال أو الشنطة. كيف تحمل كوبك؟',hint:'ارسم كيف تمسكه أو تثبّته، بدون ما يعطّل حركتك.'},
+    {id:'what-if',label:'أكثر من كوب',icon:'people' as const,prompt:'أضف للكوب وظيفة ثانية مفيدة، ووضّحها بالرسم.',hint:'وظيفة تخدم يومك، مو مجرد زينة.'},
+  ];
+  return {...content,...(drawing?sketchContent:{}),id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
     startsAt:new Date(start).toISOString(),endsAt:new Date(start+7*86400000).toISOString(),
-    angles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
+    angles:drawing?sketchAngles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
 })];
 
 export function currentChallenge(now = new Date()): WeeklyChallenge | null {
@@ -51,7 +58,7 @@ export function challengeStatus(week: WeeklyChallenge, now = new Date()): 'upcom
   return time < week.startsAt ? 'upcoming' : time < week.endsAt ? 'open' : 'closed';
 }
 export function findWeek(id: string): WeeklyChallenge | undefined { return weeklyChallenges.find(week => week.id === id); }
-export function angleLabel(id: string | null | undefined): string { return weeklyChallenges[0].angles.find(angle => angle.id === id)?.label ?? 'مشاركة سابقة'; }
+export function angleLabel(id: string | null | undefined,weekId?:string): string { return (findWeek(weekId??'')??weeklyChallenges[0]).angles.find(angle => angle.id === id)?.label ?? 'مشاركة سابقة'; }
 export const legacyChallengeIds = ['queue', 'reverse', 'alone'];
 export function validateSchedule() {
   const ordered = [...weeklyChallenges].sort((a,b) => a.startsAt.localeCompare(b.startsAt));

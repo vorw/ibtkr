@@ -8,6 +8,8 @@ import { displayNameKey, validateDisplayName } from '@/lib/profile';
 import { z } from 'zod';
 import { readOpening } from '@/lib/opening';
 import { readWeeklyOpening,concealWeeklyQuestion } from '@/lib/weekly-opening';
+import { ensureDrawingSchema,drawingRevision } from '@/lib/drawings';
+import { validDrawing,drawingDataLimit } from '@/lib/drawing-policy';
 
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown, status = 200) => Response.json(data, {
@@ -89,8 +91,8 @@ export async function GET(request: Request) {
 const common = { id: z.string().uuid() };
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('profile'), displayName: z.string().max(80) }),
-  z.object({ action: z.literal('idea'), ...common, challengeId: z.string(), angleId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
-  z.object({ action: z.literal('edit'), ...common, angleId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(10).max(2000) }),
+  z.object({ action: z.literal('idea'), ...common, challengeId: z.string(), angleId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(2).max(2000), drawing:z.string().max(drawingDataLimit).optional() }),
+  z.object({ action: z.literal('edit'), ...common, angleId: z.string(), title: z.string().trim().min(2).max(100), body: z.string().trim().min(2).max(2000), drawing:z.string().max(drawingDataLimit).optional() }),
   z.object({ action: z.literal('comment'), ...common, ideaId: z.string().uuid(), body: z.string().trim().min(5).max(1000) }),
   z.object({ action: z.literal('react'), ideaId: z.string().uuid(), liked: z.boolean() }),
 ]);
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
     if (!user) return reply({ error: 'سجّل دخولك عشان تحفظ مشاركتك. مسودتك باقية.' }, 401);
 
     const raw = await request.text();
-    if (raw.length > 12000) return reply({ error: 'المشاركة طويلة جدًا.' }, 413);
+    if (raw.length > drawingDataLimit+12000 || (raw.length>12000&&!raw.includes('"drawing"'))) return reply({ error: 'المشاركة كبيرة جدًا.' }, 413);
 
     let json: unknown;
     try { json = JSON.parse(raw); } catch { return reply({ error: 'صيغة المشاركة غير صالحة.' }, 400); }
@@ -123,6 +125,7 @@ export async function POST(request: Request) {
     }
     await ensureProfilesSchema(db);
     await ensureWeeklySchema(db);
+    await ensureDrawingSchema(db);
     const now = new Date().toISOString();
 
     if (value.action === 'profile') {
@@ -175,23 +178,36 @@ export async function POST(request: Request) {
       ideaId = value.id;
       const week=findWeek(value.challengeId);
       if (!week) return reply({error:'التحدّي غير موجود.'},404);
+      if(week.submission==='drawing'){
+        if(!validDrawing(value.drawing))return reply({error:'أضف رسمتك أولًا: ارسم هنا أو ارفع صورة.'},400);
+        if(value.body.length>180)return reply({error:'اشرح رسمتك بجملة قصيرة، حتى ١٨٠ حرفًا.'},400);
+      }else if(value.drawing!==undefined||value.body.length<10)return reply({error:'تأكد من نص المشاركة.'},400);
+      const revision=value.drawing?await drawingRevision(value.drawing):null;
       const previous=await db.prepare('SELECT user_id,challenge_id,angle_id,title,body FROM ideas WHERE id=?').bind(value.id).first<IdeaRow>();
       if(previous){
         if(previous.user_id!==user.userId || previous.challenge_id!==value.challengeId || previous.angle_id!==value.angleId || previous.title!==value.title || previous.body!==value.body) return reply({error:'سبق حفظ نسخة مختلفة من هذه المسودة.'},409);
+        const attachment=await db.prepare('SELECT revision FROM idea_drawings WHERE idea_id=?').bind(value.id).first<{revision:string}>();
+        if((attachment?.revision??null)!==revision)return reply({error:'سبق حفظ رسمة مختلفة من هذه المسودة.'},409);
         return reply({ok:true,ideaId,community:await visibleCommunity(db,user.userId,new URL(request.url).searchParams,ideaId)});
       }
       if(currentChallenge()?.id!==week.id) return reply({error:'انتهت المشاركة لهذا الأسبوع. جرّب التحدّي الحالي؛ مسودتك باقية.'},409);
       if(!week.angles.some(angle=>angle.id===value.angleId)) return reply({error:'اختر زاوية من زوايا التحدّي.'},400);
-      const savedWrite=await db.prepare(`INSERT INTO ideas (id,user_id,challenge_id,angle_id,name,title,body,created_at)
+      const statement=db.prepare(`INSERT INTO ideas (id,user_id,challenge_id,angle_id,name,title,body,created_at)
         SELECT ?,?,?,?,?,?,?,? WHERE ?<=strftime('%Y-%m-%dT%H:%M:%fZ','now') AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<?
         ON CONFLICT(id) DO NOTHING`)
-        .bind(value.id,user.userId,week.id,value.angleId,participantName,value.title,value.body,now,week.startsAt,week.endsAt).run();
+        .bind(value.id,user.userId,week.id,value.angleId,participantName,value.title,value.body,now,week.startsAt,week.endsAt);
+      const writes=[statement];
+      if(value.drawing)writes.push(db.prepare(`INSERT OR IGNORE INTO idea_drawings (idea_id,image_data,revision)
+        SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM ideas WHERE id=? AND user_id=? AND challenge_id=? AND angle_id=? AND title=? AND body=?)`)
+        .bind(value.id,value.drawing,revision,value.id,user.userId,week.id,value.angleId,value.title,value.body));
+      const [savedWrite]=await db.batch(writes);
       if(!savedWrite.meta.changes) return reply({error:'انتهى وقت المشاركة. مسودتك باقية.'},409);
 
       const saved = await db.prepare('SELECT user_id,challenge_id,angle_id,title,body FROM ideas WHERE id=?').bind(value.id).first<Pick<IdeaRow, 'user_id' | 'challenge_id' | 'angle_id' | 'title' | 'body'>>();
       if (!saved || saved.user_id !== user.userId || saved.challenge_id !== value.challengeId || saved.angle_id !== value.angleId || saved.title !== value.title || saved.body !== value.body) {
         return reply({ error: 'سبق حفظ نسخة مختلفة من هذه المسودة. افتحها من أفكارك لتطويرها.' }, 409);
       }
+      if(revision&&(await db.prepare('SELECT revision FROM idea_drawings WHERE idea_id=?').bind(value.id).first<{revision:string}>())?.revision!==revision)return reply({error:'لم تتأكد مطابقة الرسمة. أعد المحاولة بنفس المسودة.'},409);
     } else if (value.action === 'edit') {
       ideaId = value.id;
       const row = await db.prepare('SELECT user_id,challenge_id FROM ideas WHERE id=?').bind(value.id).first<{ user_id: string; challenge_id: string }>();
@@ -199,9 +215,18 @@ export async function POST(request: Request) {
       if (row.user_id !== user.userId) return reply({ error: 'تقدر تعدّل فكرتك أنت فقط.' }, 403);
       const week=findWeek(row.challenge_id);
       if(!week || currentChallenge()?.id!==week.id) return reply({error:'أُغلقت هذه المشاركة للحفاظ على نتيجة الأسبوع.'},409);
+      const existing=await db.prepare('SELECT revision FROM idea_drawings WHERE idea_id=?').bind(value.id).first<{revision:string}>();
+      if(week.submission==='drawing'){
+        if(value.body.length>180||(!(value.drawing===undefined&&existing)&&!validDrawing(value.drawing)))return reply({error:'أضف رسمة وجملة قصيرة حتى ١٨٠ حرفًا.'},400);
+      }else if(value.drawing!==undefined||value.body.length<10)return reply({error:'تأكد من نص المشاركة.'},400);
       if(!week.angles.some(angle=>angle.id===value.angleId)) return reply({error:'اختر زاوية من زوايا التحدّي.'},400);
-      const changed=await db.prepare(`UPDATE ideas SET name=?,title=?,body=?,angle_id=? WHERE id=? AND user_id=? AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<?`)
-        .bind(participantName,value.title,value.body,value.angleId,value.id,user.userId,week.endsAt).run();
+      const writes=[db.prepare(`UPDATE ideas SET name=?,title=?,body=?,angle_id=? WHERE id=? AND user_id=? AND strftime('%Y-%m-%dT%H:%M:%fZ','now')<?`)
+        .bind(participantName,value.title,value.body,value.angleId,value.id,user.userId,week.endsAt)];
+      if(value.drawing)writes.push(db.prepare(`INSERT INTO idea_drawings (idea_id,image_data,revision)
+        SELECT ?,?,? WHERE changes()>0 AND EXISTS (SELECT 1 FROM ideas WHERE id=? AND user_id=?)
+        ON CONFLICT(idea_id) DO UPDATE SET image_data=excluded.image_data,revision=excluded.revision`)
+        .bind(value.id,value.drawing,await drawingRevision(value.drawing),value.id,user.userId));
+      const [changed]=await db.batch(writes);
       if(!changed.meta.changes) return reply({error:'انتهى وقت تعديل المشاركة.'},409);
     } else {
       ideaId = value.ideaId;

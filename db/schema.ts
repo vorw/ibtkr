@@ -21,6 +21,12 @@ export const ideas = sqliteTable('ideas', {
   createdAt: text('created_at').notNull(),
 }, t => [index('idx_ideas_user').on(t.userId), index('idx_ideas_week_created').on(t.challengeId,t.createdAt,t.id), index('idx_ideas_week_angle').on(t.challengeId,t.angleId,t.createdAt)]);
 
+export const ideaDrawings = sqliteTable('idea_drawings', {
+  ideaId: text('idea_id').primaryKey().references(() => ideas.id),
+  imageData: text('image_data').notNull(),
+  revision: text('revision').notNull(),
+});
+
 export const comments = sqliteTable('comments', {
   id: text('id').primaryKey(),
   ideaId: text('idea_id').notNull().references(() => ideas.id),

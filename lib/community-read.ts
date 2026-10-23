@@ -1,6 +1,7 @@
 import type { AppData, Comment, Idea, Leader } from './challenges';
 import { currentChallenge, challengeStatus, findWeek, weeklyChallenges, legacyChallengeIds } from './weekly';
 import { finalizeClosedWeeks, scoresSQL } from './weekly-db';
+import { ensureDrawingSchema } from './drawings';
 
 const pageSize=12;
 const numberPage=(value:string|null)=>Math.min(100000,Math.max(1,Number.parseInt(value??'1',10)||1));
@@ -8,6 +9,7 @@ type IdeaRow=Omit<Idea,'isOwn'|'liked'|'comments'> & {user_id:string;liked:numbe
 type CommentRow=Omit<Comment,'isOwn'> & {user_id:string};
 
 export async function readCommunity(db:D1Database,userId:string|null,params=new URLSearchParams(), focusId?:string):Promise<AppData> {
+  await ensureDrawingSchema(db);
   const now=new Date();const current=currentChallenge(now);
   const available=weeklyChallenges.filter(week=>week.startsAt<=now.toISOString()).sort((a,b)=>b.startsAt.localeCompare(a.startsAt));
   const requested=params.get('week');
@@ -26,6 +28,7 @@ export async function readCommunity(db:D1Database,userId:string|null,params=new 
   const total=(await db.prepare(`SELECT COUNT(*) n FROM ideas i LEFT JOIN profiles p ON p.user_id=i.user_id WHERE ${clause}`).bind(...bindings).first<{n:number}>())?.n??0;
   const pages=Math.max(1,Math.ceil(total/pageSize));const page=Math.min(pages,numberPage(params.get('page')));
   const select=`SELECT i.id,i.user_id,i.challenge_id,i.angle_id,COALESCE(p.display_name,i.name) name,i.title,i.body,i.created_at,
+    (SELECT revision FROM idea_drawings d WHERE d.idea_id=i.id) drawingRevision,
     (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.liked=1 AND r.user_id<>i.user_id) likes,
     (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.user_id=? AND r.liked=1) liked,
     (SELECT COUNT(*) FROM comments c WHERE c.idea_id=i.id) commentCount
