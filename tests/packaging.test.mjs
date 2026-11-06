@@ -39,3 +39,17 @@ test('30 attempts in one browser receive 30 different tasks',async()=>{
 test('an attempt cannot extend beyond the weekly closing deadline',async()=>{
   const g=game(new Map(),Date.parse(weekEnd)-30000);await g.run('begin()');assert.equal(g.run('state.deadline'),Date.parse(weekEnd));
 });
+test('only two skips reveal different tasks without resetting time, even after refresh',async()=>{
+ const g=game();await g.run('begin()');const original=g.run('state.task'),deadline=g.run('state.deadline');
+ g.advance(10000);g.run("strokes=[{mode:'pen',width:5,points:[{x:1,y:1}]}];skipTask()");
+ const second=g.run('state.task');assert.notEqual(second,original);assert.equal(g.run('strokes.length'),0);
+ assert.equal(g.run('state.deadline'),deadline);assert.equal(g.run('skipCount()'),1);
+ const restored=game(g.saved,weekStart+10000);assert.equal(restored.run('skipCount()'),1);
+ restored.run('skipTask()');const third=restored.run('state.task');assert.notEqual(third,original);assert.notEqual(third,second);
+ assert.equal(restored.run('state.deadline'),deadline);assert.equal(restored.run('skipCount()'),2);assert.equal(restored.element('skip').disabled,true);
+ restored.run('skipTask()');assert.equal(restored.run('state.task'),third);assert.equal(restored.run('skipCount()'),2);
+ const again=game(restored.saved,weekStart+10000);again.run('skipTask()');assert.equal(again.run('state.task'),third);
+});
+test('skipping is blocked once the timer expires or the attempt finishes',async()=>{
+ const g=game();await g.run('begin()');const task=g.run('state.task');g.advance(120000);g.run('skipTask()');assert.equal(g.run('state.task'),task);assert.equal(g.run('skipCount()'),0);assert.equal(g.element('skip').disabled,true);
+});
