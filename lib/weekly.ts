@@ -1,6 +1,18 @@
 import { preparedChallenges } from './weekly-content';
 export type Angle = { id: string; label: string; prompt: string; hint: string; icon: 'shuffle' | 'flip' | 'people' };
-export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[]; submission?: 'drawing'; drawingTheme?: 'warning-symbols' };
+export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[]; submission?: 'drawing'; drawingTheme?: 'warning-symbols' | 'packaging-icons' };
+
+export const packagingChallengeContent={
+  category:'تحدّي الرسم · دقيقتان',title:'رسالة على علبة. يفهمها أي أحد.',
+  short:'مهمة مفاجأة، ودقيقتان لتصميم رمز تغليف يُفهم بدون كلمات.',
+  description:'صمّم رمزًا يوصل تعليمات التعامل مع طرد. ابدأ المؤقت لتكشف مهمتك، ثم ارسم رمزك خلال دقيقتين باستخدام العلبة والأشكال والأسهم، بدون كلمات.',
+  submission:'drawing' as const,drawingTheme:'packaging-icons' as const,
+  angles:[
+    {id:'change',label:'الحماية والتخزين',icon:'shuffle' as const,prompt:'صمّم رمزًا يوضّح تعليمات حماية الطرد وتخزينه.',hint:'المهمة تُكشف بعد بدء المؤقت؛ ارسم باستخدام العلبة والأشكال والأسهم فقط.'},
+    {id:'reverse',label:'النقل والفتح',icon:'flip' as const,prompt:'صمّم رمزًا يوضّح حركة التعامل مع العبوة أو فتحها.',hint:'المهمة تُكشف بعد بدء المؤقت؛ ارسم باستخدام العلبة والأشكال والأسهم فقط.'},
+    {id:'what-if',label:'الاستخدام والتدوير',icon:'people' as const,prompt:'صمّم رمزًا يوضّح استخدام العبوة أو ما يحدث بعد إفراغها.',hint:'المهمة تُكشف بعد بدء المؤقت؛ ارسم باستخدام العلبة والأشكال والأسهم فقط.'},
+  ],
+};
 
 // Retain the original comparison preview independently of the scheduled round.
 export const cupPreviewContent={
@@ -57,10 +69,10 @@ export const weeklyChallenges: WeeklyChallenge[] = [{
     {id:'reverse',label:'اقلب الفكرة',icon:'flip'},
     {id:'what-if',label:'ماذا لو؟',icon:'people'},
   ];
-  const drawing=index===0;
-  return {...content,...(drawing?warningChallengeContent:{}),id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
+  const drawing=index===0,packaging=localDate==='2026-11-11';
+  return {...content,...(drawing?warningChallengeContent:{}),...(packaging?packagingChallengeContent:{}),id:'week-'+localDate,number:String(index+3).padStart(2,'0'),
     startsAt:new Date(start).toISOString(),endsAt:new Date(start+7*86400000).toISOString(),
-    angles:drawing?warningChallengeContent.angles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
+    angles:packaging?packagingChallengeContent.angles:drawing?warningChallengeContent.angles:content.angles.map((angle,i)=>({...angle,...types[i]}))};
 })];
 
 export function currentChallenge(now = new Date()): WeeklyChallenge | null {
@@ -93,3 +105,4 @@ export function validateSchedule() {
   }
 }
 validateSchedule();
+

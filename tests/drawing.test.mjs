@@ -32,6 +32,19 @@ test('raster validation rejects SVG, spoofed data, oversized bytes and oversized
   for(const data of ['', 'https://example.test/a.jpg','data:image/svg+xml;base64,PHN2Zz4=','data:image/jpeg;base64,'+btoa('<script>alert(1)</script>'),jpeg+'AAAA',jpeg.slice(0,-4),'data:image/jpeg;base64,'+'A'.repeat(240004)])assert.equal(validDrawing(data),false);
   const raw=Buffer.from(jpeg.slice(23),'base64'),frame=raw.indexOf(Buffer.from([255,192]));raw.writeUInt16BE(5000,frame+7);assert.equal(validDrawing('data:image/jpeg;base64,'+raw.toString('base64')),false);
 });
+test('week 05 packaging drawings use the normal contribution and retry flow',async()=>{
+  const packaging=weeklyChallenges[4];
+  assert.equal(packaging.id,'week-2026-11-11');assert.equal(packaging.number,'05');
+  assert.equal(packaging.startsAt,'2026-11-06T21:00:00.000Z');assert.equal(packaging.endsAt,'2026-11-13T21:00:00.000Z');
+  assert.equal(packaging.drawingTheme,'packaging-icons');assert.equal(packaging.submission,'drawing');
+  assert.equal(weeklyChallenges[3].title,'فريق واحد… مو شخص واحد.');
+  mock.timers.tick(14*86400000);state.databaseNow=packaging.startsAt;
+  state.db.prepare('INSERT INTO opening_events VALUES (?,?,?)').run('ibtkr-weekly-ribbon-'+packaging.id,5,packaging.startsAt);
+  const value=entry({challengeId:packaging.id,title:'رمز: قابل للكسر',body:'قابل للكسر'});
+  const first=await post(value);assert.equal(first.status,200);assert.match(first.body.community.focusedIdea.drawingRevision,/^[a-f0-9]{64}$/);
+  assert.equal((await post(value)).status,200);assert.equal(state.db.prepare('SELECT COUNT(*) n FROM ideas').get().n,1);
+  assert.equal((await post({...value,id:randomUUID(),drawing:undefined})).status,400);
+});
 test('a drawing and caption save atomically, retry once, and images never bulk-load in the community response',async()=>{
   const value=entry(),first=await post(value);assert.equal(first.status,200);const saved=first.body.community.focusedIdea;
   assert.match(saved.drawingRevision,/^[a-f0-9]{64}$/);assert.equal(saved.body,value.body);assert.equal(JSON.stringify(first.body).includes('base64'),false);
@@ -80,3 +93,4 @@ test('drawing drafts recover without accepting external URLs',()=>{
   const draft={id:randomUUID(),title:'رسمة',body:'فكرتي',angleId:'change',drawing:jpeg};assert.equal(readIdeaDraft(JSON.stringify(draft)).drawing,jpeg);
   assert.equal(readIdeaDraft(JSON.stringify({...draft,drawing:'https://bad.test/picture.svg'})).drawing,undefined);
 });
+
