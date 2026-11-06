@@ -1,7 +1,7 @@
 'use client';
 
 import OpeningGate, { SitePreviewContext } from './opening-gate';
-import { weeklyRibbonFor } from '@/lib/weekly-ribbon-policy';
+import { weeklyRibbonFor,weeklyRibbonReviewUntil } from '@/lib/weekly-ribbon-policy';
 import DrawingStudio, { DrawingImage,readDrawing } from './drawing-studio';
 import WeeklyChallengeView from './weekly-challenge-view';
 import PackagingChallenge,{type PackagingResult} from './packaging-challenge';
@@ -285,8 +285,9 @@ export default function InnovationApp() {
   }, [data.profile?.displayName]);
 
   useEffect(()=>{const timer=setTimeout(()=>{if(!selected)setLoading(true);void refresh();},search?250:0);return()=>clearTimeout(timer);},[queryKey,refresh]);
-  useEffect(()=>{const timer=setInterval(()=>{
+  useEffect(()=>{let reviewExpired=Date.now()>=Date.parse(weeklyRibbonReviewUntil);const timer=setInterval(()=>{
     const now=Date.now()+serverOffset.current;setTick(now);
+    if(!reviewExpired&&Date.now()>=Date.parse(weeklyRibbonReviewUntil)){reviewExpired=true;void refresh();}
     if(document.visibilityState==='visible'&&(tab==='leaderboard'||tab==='ideas'||(mission&&Date.parse(mission.endsAt)<=now)))void refresh();
   },30000);return()=>clearInterval(timer);},[tab,refresh,mission?.endsAt]);
   useEffect(()=>{
