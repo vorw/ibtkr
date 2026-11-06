@@ -53,3 +53,12 @@ test('only two skips reveal different tasks without resetting time, even after r
 test('skipping is blocked once the timer expires or the attempt finishes',async()=>{
  const g=game();await g.run('begin()');const task=g.run('state.task');g.advance(120000);g.run('skipTask()');assert.equal(g.run('state.task'),task);assert.equal(g.run('skipCount()'),0);assert.equal(g.element('skip').disabled,true);
 });
+test('finished attempts expose only share and cannot restart, including after refresh',async()=>{
+ const g=game();await g.run('begin()');const id=g.run('state.attemptId'),task=g.run('state.task');
+ g.run('end(true)');await g.run('begin()');assert.equal(g.run('state.status'),'done');assert.equal(g.run('state.attemptId'),id);assert.equal(g.run('state.task'),task);
+ assert.equal(g.element('drawing-tools').hidden,true);assert.equal(g.element('skip').hidden,true);assert.equal(g.element('finish').hidden,true);
+ const restored=game(g.saved);await restored.run('begin()');assert.equal(restored.run('state.attemptId'),id);assert.equal(restored.run('state.status'),'done');
+ const actions=html.match(/<div id="actions"[\s\S]*?<\/div>/)[0];assert.equal((actions.match(/<button /g)||[]).length,1);assert.match(actions,/id="publish"/);
+ for(const id of ['sound','download','again'])assert.equal(html.includes('id="'+id+'"'),false);
+ assert.ok(html.includes('ابدأ التحدّي (دقيقتان)'));assert.equal(html.includes('تخطّ المهمة ·'),false);
+});
