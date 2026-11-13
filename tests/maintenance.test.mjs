@@ -15,10 +15,28 @@ registerHooks({resolve(s,c,next){
 }});
 const {calls}=await import(stubUrl);
 const worker=(await import('../worker.ts')).default;
-const {maintenanceResponse,MAINTENANCE_ENDS_AT}=await import('../lib/maintenance.ts');
+const {maintenanceResponse,MAINTENANCE_STARTS_AT,MAINTENANCE_ENDS_AT}=await import('../lib/maintenance.ts');
+const start=Date.parse(MAINTENANCE_STARTS_AT);
 const end=Date.parse(MAINTENANCE_ENDS_AT);
 afterEach(()=>{mock.timers.reset();calls.length=0});
 
+test('site and scheduled jobs remain available until Friday 11:59 pm Riyadh',async()=>{
+  assert.equal(MAINTENANCE_STARTS_AT,'2026-11-13T20:59:00.000Z');
+  mock.timers.enable({apis:['Date'],now:start-1});
+  for(const path of ['/','/login','/api/community','/api/drawing']) {
+    assert.equal(maintenanceResponse(new Request('https://ibtkr.space'+path)),null);
+  }
+  assert.equal(await (await worker.fetch(new Request('https://ibtkr.space/'),{},{})).text(),'normal site');
+  await worker.scheduled({},{});
+  assert.deepEqual(calls,['fetch','schema','finalize','email']);
+});
+test('pause activates at exactly Friday 11:59 pm Riyadh',async()=>{
+  mock.timers.enable({apis:['Date'],now:start});
+  assert.equal((await worker.fetch(new Request('https://ibtkr.space/'),{},{})).status,503);
+  assert.equal((await worker.fetch(new Request('https://ibtkr.space/api/community',{method:'POST'}),{},{})).status,503);
+  await worker.scheduled({},{});
+  assert.deepEqual(calls,[]);
+});
 test('all page routes show a temporary no-store maintenance response before the deadline',async()=>{
   for(const path of ['/','/login','/drawing-preview2','/lab/private-preview','/?view=leaderboard']){
     const response=maintenanceResponse(new Request('https://ibtkr.space'+path),end-1);
