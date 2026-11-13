@@ -23,8 +23,11 @@ test('all page routes show a temporary no-store maintenance response before the 
   for(const path of ['/','/login','/drawing-preview2','/lab/private-preview','/?view=leaderboard']){
     const response=maintenanceResponse(new Request('https://ibtkr.space'+path),end-1);
     assert.equal(response.status,503);assert.match(response.headers.get('cache-control'),/no-store/);
-    assert.equal(response.headers.get('retry-after'),'Fri, 06 Nov 2026 21:00:00 GMT');
-    assert.match(await response.text(),/نعود السبت، ٧ نوفمبر/);
+    assert.equal(response.headers.get('retry-after'),'Fri, 20 Nov 2026 21:00:00 GMT');
+    const html=await response.text();
+    assert.match(html,/نعود السبت، ٢١ نوفمبر/);
+    assert.match(html,/الحين وقت المذاكرة/);
+    assert.match(html,/الله يفتح عليكم وييسّر اختباراتكم/);
   }
 });
 test('stale clients cannot submit, vote, cut ribbons or run email endpoints',async()=>{
@@ -54,3 +57,4 @@ test('at exactly Saturday midnight Riyadh, requests and the existing cron resume
   await worker.scheduled({},{});
   assert.deepEqual(calls,['fetch','schema','finalize','email']);
 });
+
