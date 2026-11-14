@@ -9,6 +9,7 @@ export async function finalizeClosedWeeks(){calls.push('finalize')}
 export async function runWeeklyEmailJob(){calls.push('email')}`;
 const stubUrl = 'data:text/javascript,' + encodeURIComponent(stub);
 registerHooks({resolve(s,c,next){
+  if(s.endsWith('/committee-review.js'))return {url:'data:text/javascript,export const committeeReviewEnabled=false;',shortCircuit:true};
   if (['vinext/server/fetch-handler','./lib/weekly-db','./lib/weekly-schema','./lib/weekly-email'].includes(s)) return {url:stubUrl,shortCircuit:true};
   if (s==='./lib/maintenance') return {url:new URL('../lib/maintenance.ts',import.meta.url).href,shortCircuit:true};
   return next(s,c);
@@ -75,4 +76,5 @@ test('at exactly Saturday midnight Riyadh, requests and the existing cron resume
   await worker.scheduled({},{});
   assert.deepEqual(calls,['fetch','schema','finalize','email']);
 });
+
 

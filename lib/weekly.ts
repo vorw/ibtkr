@@ -1,4 +1,5 @@
 import { preparedChallenges } from './weekly-content';
+import { committeeReviewWeekId } from './committee-review.js';
 export type Angle = { id: string; label: string; prompt: string; hint: string; icon: 'shuffle' | 'flip' | 'people' };
 export type WeeklyChallenge = { id: string; number: string; category: string; title: string; short: string; description: string; startsAt: string; endsAt: string; angles: Angle[]; submission?: 'drawing'; drawingTheme?: 'warning-symbols' | 'packaging-icons' };
 
@@ -79,6 +80,11 @@ export function currentChallenge(now = new Date()): WeeklyChallenge | null {
   const time = now.toISOString();
   return weeklyChallenges.find(week => week.startsAt <= time && time < week.endsAt) ?? null;
 }
+// Presentation selection only. currentChallenge and SQL deadline checks still
+// use real time, so historical entries cannot become eligible for new votes.
+export function displayedChallenge(now = new Date()): WeeklyChallenge | null {
+  return (committeeReviewWeekId ? findWeek(committeeReviewWeekId) : null) ?? currentChallenge(now);
+}
 export function challengeStatus(week: WeeklyChallenge, now = new Date()): 'upcoming' | 'open' | 'closed' {
   const time = now.toISOString();
   return time < week.startsAt ? 'upcoming' : time < week.endsAt ? 'open' : 'closed';
@@ -105,4 +111,5 @@ export function validateSchedule() {
   }
 }
 validateSchedule();
+
 

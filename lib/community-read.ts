@@ -1,5 +1,6 @@
 import type { AppData, Comment, Idea, Leader } from './challenges';
-import { currentChallenge, challengeStatus, findWeek, weeklyChallenges, legacyChallengeIds } from './weekly';
+import { committeeReviewEnabled } from './committee-review.js';
+import { displayedChallenge, challengeStatus, findWeek, weeklyChallenges, legacyChallengeIds } from './weekly';
 import { finalizeClosedWeeks, scoresSQL } from './weekly-db';
 import { ensureDrawingSchema } from './drawings';
 
@@ -10,8 +11,9 @@ type CommentRow=Omit<Comment,'isOwn'> & {user_id:string};
 
 export async function readCommunity(db:D1Database,userId:string|null,params=new URLSearchParams(), focusId?:string):Promise<AppData> {
   await ensureDrawingSchema(db);
-  const now=new Date();const current=currentChallenge(now);
-  const available=weeklyChallenges.filter(week=>week.startsAt<=now.toISOString()).sort((a,b)=>b.startsAt.localeCompare(a.startsAt));
+  const now=new Date();const current=displayedChallenge(now);
+  const availableBefore=committeeReviewEnabled&&current?new Date(Date.parse(current.endsAt)-1).toISOString():now.toISOString();
+  const available=weeklyChallenges.filter(week=>week.startsAt<=availableBefore).sort((a,b)=>b.startsAt.localeCompare(a.startsAt));
   const requested=params.get('week');
   const selected=(requested==='legacy'||requested==='all')?(current??available[0]??null):(requested && requested!=='current'?available.find(week=>week.id===requested):current??available[0])??null;
   const legacy=requested==='legacy';const all=requested==='all';const status=legacy?'legacy':selected?challengeStatus(selected,now):'waiting';
@@ -68,7 +70,8 @@ export async function readCommunity(db:D1Database,userId:string|null,params=new 
   return {activityVersion:reset?'official-launch-2026-10-07':undefined,signedIn:Boolean(userId),ideas:rows.results.map(map),focusedIdea,discussion,
     profile:profile?{displayName:profile.display_name}:null,
     progress:{ideas:own?.total??0,reviews:reviews?.total??0,xp:(own?.rewarded??0)*20+(reviews?.total??0)*5},
-    weekly:{current,selected,weeks:available,status,serverNow:now.toISOString(),leaders,leaderTotal,leaderPage,ownEntries,ownLikes,finalized},
+    weekly:{review:committeeReviewEnabled,current,selected,weeks:available,status,serverNow:now.toISOString(),leaders,leaderTotal,leaderPage,ownEntries,ownLikes,finalized},
     pagination:{page,pageSize,total:userId?total:0,pages:userId?pages:1},
   };
 }
+

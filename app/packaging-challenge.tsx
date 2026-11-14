@@ -3,13 +3,14 @@ import { useEffect,useMemo,useRef,useState } from 'react';
 import type { WeeklyChallenge } from '@/lib/weekly';
 import { packagingGameHtml,packagingTasks } from '@/lib/packaging-game';
 import { validDrawing } from '@/lib/drawing-policy';
+import { packagingSession } from '@/lib/committee-review.js';
 
 export type PackagingResult={id:string;task:number;drawing:string};
-export default function PackagingChallenge({week,onComplete,timeLeft}:{week:WeeklyChallenge;onComplete:(result:PackagingResult)=>void;timeLeft:string}){
+export default function PackagingChallenge({week,onComplete,timeLeft,review=false}:{week:WeeklyChallenge;onComplete:(result:PackagingResult)=>void;timeLeft:string;review?:boolean}){
   const frame=useRef<HTMLIFrameElement>(null),complete=useRef(onComplete);
   const [height,setHeight]=useState(800);
   complete.current=onComplete;
-  const html=useMemo(()=>packagingGameHtml.replace('__PACKAGING_TASKS__',JSON.stringify(packagingTasks)).replaceAll('__WEEK_ID__',week.id).replaceAll('__WEEK_ENDS__',week.endsAt),[week.id,week.endsAt]);
+  const html=useMemo(()=>{const session=packagingSession(week,review);return packagingGameHtml.replace('__PACKAGING_TASKS__',JSON.stringify(packagingTasks)).replaceAll('__WEEK_ID__',session.storageWeekId).replaceAll('__WEEK_ENDS__',session.endsAt);},[week.id,week.endsAt,review]);
   useEffect(()=>{
     const receive=(event:MessageEvent)=>{
       if(event.source!==frame.current?.contentWindow||event.origin!==window.location.origin)return;
@@ -22,5 +23,6 @@ export default function PackagingChallenge({week,onComplete,timeLeft}:{week:Week
     };
     window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);
   },[]);
-  return <section aria-label="تحدّي رموز التغليف"><div className="workspace-label"><span>الأسبوع {week.number} · تحدّي الرسم</span><span>ينتهي الجمعة ١١:٥٩ م · {timeLeft}</span></div><iframe ref={frame} srcDoc={html} title="رسالة على علبة · دقيقتان للرسم" style={{display:'block',width:'100%',height,border:0,background:'var(--background)'}} /></section>;
+  return <section aria-label="تحدّي رموز التغليف"><div className="workspace-label"><span>الأسبوع {week.number} · تحدّي الرسم</span><span>{review?'معاينة · دقيقتان للرسم':<>ينتهي الجمعة ١١:٥٩ م · {timeLeft}</>}</span></div><iframe ref={frame} srcDoc={html} title="رسالة على علبة · دقيقتان للرسم" style={{display:'block',width:'100%',height,border:0,background:'var(--background)'}} /></section>;
 }
+

@@ -1,10 +1,12 @@
+import { committeeReviewEnabled } from './committee-review.js';
+
 // Temporary pause. Expiry is evaluated per request and cron invocation;
 // normal operation resumes without another deployment or a new scheduled task.
 export const MAINTENANCE_STARTS_AT = '2026-11-13T20:59:00.000Z';
 export const MAINTENANCE_ENDS_AT = '2026-11-20T21:00:00.000Z';
 
 export function isMaintenanceActive(now = Date.now()): boolean {
-  return now >= Date.parse(MAINTENANCE_STARTS_AT) && now < Date.parse(MAINTENANCE_ENDS_AT);
+  return !committeeReviewEnabled && now >= Date.parse(MAINTENANCE_STARTS_AT) && now < Date.parse(MAINTENANCE_ENDS_AT);
 }
 
 const maintenanceAssets = new Set([
@@ -85,4 +87,5 @@ export function maintenanceResponse(request: Request, now = Date.now()): Respons
     },
   });
 }
+
 

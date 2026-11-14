@@ -1,4 +1,5 @@
 import { getParticipant } from '@/lib/auth-server';
+import { committeeReviewEnabled } from '@/lib/committee-review.js';
 import { database } from '@/lib/database';
 import { type Comment, type Idea } from '@/lib/challenges';
 import { readCommunity } from '@/lib/community-read';
@@ -62,7 +63,7 @@ async function getProfile(db: D1Database, userId: string): Promise<ProfileRow | 
 
 async function visibleCommunity(...args:Parameters<typeof readCommunity>){
   const result=await readCommunity(...args),current=result.weekly.current;
-  result.weekly.ribbonOpen=current?(await readWeeklyOpening(args[0],current)).isOpen:true;
+  result.weekly.ribbonOpen=committeeReviewEnabled||!current?true:(await readWeeklyOpening(args[0],current)).isOpen;
   if(current&&!result.weekly.ribbonOpen){
     result.weekly.current=concealWeeklyQuestion(current);
     if(result.weekly.selected?.id===current.id)result.weekly.selected=concealWeeklyQuestion(current);
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return reply({ error: 'تأكد من البيانات ثم جرّب ثانية.' }, 400);
 
     const value = parsed.data;
+    if(committeeReviewEnabled&&value.action!=='profile')return reply({error:'الموقع في وضع المعاينة. المشاركات والنتائج الأصلية محفوظة، والنشر والتصويت مغلقان.'},403);
     const db = database();
     if(!(await readOpening(db,user.userId)).isOpen)return reply({error:'المشاركة تفتح بعد اكتمال الافتتاح.'},423);
     if(value.action==='idea'||value.action==='edit'){
@@ -259,3 +261,4 @@ export async function POST(request: Request) {
     return reply({ error: 'ما تأكدنا من الحفظ. كلامك موجود؛ جرّب مرة ثانية ولن تتكرر المشاركة.' }, 503);
   }
 }
+

@@ -24,7 +24,7 @@ import { getAuth, sessionHeaders, signOut } from '@/lib/auth-client';
 import { ThemeToggle } from './theme-toggle';
 import { toast } from 'sonner';
 import { type AppData, type Idea } from '@/lib/challenges';
-import { currentChallenge, findWeek, angleLabel, weeklyChallenges, type WeeklyChallenge as Challenge } from '@/lib/weekly';
+import { currentChallenge, displayedChallenge, findWeek, angleLabel, weeklyChallenges, type WeeklyChallenge as Challenge } from '@/lib/weekly';
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 
 const initial: AppData = { signedIn: false, ideas: [], progress: { xp: 0, ideas: 0, reviews: 0 }, profile: null, weekly:{current:null,selected:null,weeks:[],status:'waiting',serverNow:'',ownEntries:0,ownLikes:0,leaders:[],leaderTotal:0,leaderPage:1,finalized:false},pagination:{page:1,pageSize:12,total:0,pages:1} };
@@ -188,7 +188,7 @@ export default function InnovationApp() {
   const refreshVersion = useRef(0);
   const pendingResume = useRef<Resume | null>(null);
   const active = data.focusedIdea?.id===selected ? data.focusedIdea : openedIdea?.id===selected?openedIdea: data.ideas.find((idea) => idea.id === selected);
-  const mission = data.weekly.current ?? (loading ? currentChallenge() : null);
+  const mission = data.weekly.current ?? (loading ? displayedChallenge() : null);
   const angle=missionIndex === null ? undefined : mission?.angles[missionIndex];
   const feed=data.ideas;
   const remaining=mission?Math.max(0,new Date(mission.endsAt).getTime()-tick):0;
@@ -270,7 +270,7 @@ export default function InnovationApp() {
   }, [data, error, loading]);
 
   useEffect(() => {
-    if (compose && draft.id) storage.set(editing ? 'ftc-edit-' + draft.id : 'ftc-draft-' + compose.id + '-' + draft.angleId, JSON.stringify(draft));
+    if (compose && draft.id) storage.set(data.weekly.review?'ftc-review-draft-'+compose.id+'-'+draft.angleId:editing ? 'ftc-edit-' + draft.id : 'ftc-draft-' + compose.id + '-' + draft.angleId, JSON.stringify(draft));
   }, [compose, editing, draft]);
   useEffect(() => {
     if (!selected) return;
@@ -290,12 +290,12 @@ export default function InnovationApp() {
     if(document.visibilityState==='visible'&&(tab==='leaderboard'||tab==='ideas'||(mission&&Date.parse(mission.endsAt)<=now)))void refresh();
   },30000);return()=>clearInterval(timer);},[tab,refresh,mission?.endsAt]);
   useEffect(()=>{
-    if(!mission)return;
+    if(!mission||data.weekly.review)return;
     const delay=Date.parse(mission.endsAt)-(Date.now()+serverOffset.current);
     if(delay<=0){void refresh();return;}
     const timer=setTimeout(()=>{setTick(Date.parse(mission.endsAt));void refresh();},Math.min(delay+100,2147483647));
     return()=>clearTimeout(timer);
-  },[mission?.id,mission?.endsAt,data.weekly.serverNow,refresh]);
+  },[mission?.id,mission?.endsAt,data.weekly.serverNow,data.weekly.review,refresh]);
   useEffect(()=>{
     if(loading||error)return;
     const previous=observedWeek.current;
@@ -386,11 +386,11 @@ export default function InnovationApp() {
     setDraft({...value,angleId:value.angleId??angleId}); setCompose(challenge);
   }
   function completePackaging(result:PackagingResult){
-    if(!mission||mission.drawingTheme!=='packaging-icons'||currentChallenge()?.id!==mission.id){toast.error('أُغلق التحدّي. رسمتك محفوظة على جهازك.');return;}
+    if(!mission||mission.drawingTheme!=='packaging-icons'||(!data.weekly.review&&currentChallenge()?.id!==mission.id)){toast.error('أُغلق التحدّي. رسمتك محفوظة على جهازك.');return;}
     const task=packagingTasks[result.task];if(!task)return;
     const angleId=mission.angles[Math.floor(result.task/10)]?.id;if(!angleId)return;
     const value:Draft={id:result.id,title:'رمز: '+task[0],body:task[0],angleId,drawing:result.drawing};
-    storage.set('ftc-draft-'+mission.id+'-'+angleId,JSON.stringify(value));
+    storage.set((data.weekly.review?'ftc-review-draft-':'ftc-draft-')+mission.id+'-'+angleId,JSON.stringify(value));
     rememberOrigin();setSelected(null);setEditing(false);setFormError('');setDrawingLoading(false);setDraft(value);setCompose(mission);
   }
   function openIdea(idea: Idea, focusComment = false) {
@@ -420,6 +420,7 @@ export default function InnovationApp() {
   }
   async function saveIdea(event: FormEvent) {
     event.preventDefault(); if (!compose || mutationLock.current) return;
+    if(data.weekly.review){setFormError('هذه معاينة فقط. لن تُنشر الرسمة أو تتغيّر النتائج.');return;}
     if(compose.submission==='drawing'&&!draft.drawing){setFormError('أضف رسمتك أولًا: ارسم هنا أو ارفع صورة.');return;}
     mutationLock.current = true; setBusy(true); setFormError('');
     try {
@@ -504,12 +505,13 @@ export default function InnovationApp() {
       </div></header>
 
       <main className="workspace" id="main-content" data-activity-version={data.activityVersion} tabIndex={-1}>
+        {data.weekly.review&&<div className="week-change-notice" role="status"><div><strong>معاينة الأسبوع {mission?.number}</strong><p>جرّب تحدّي الرسم واستعرض المشاركات والنتائج الأصلية. النشر والتصويت مغلقان.</p></div></div>}
         {error && <div className="system-banner error" role="alert"><span>{error}</span><button onClick={() => void refresh()}>إعادة المحاولة</button></div>}
         {closedWeek&&<div className="week-change-notice" role="status"><Trophy size={22}/><div><strong>انتهى تحدّي الأسبوع {closedWeek.number}.</strong><p>{data.weekly.current?'النتائج محفوظة، والتحدّي الجديد جاهز.':'النتائج محفوظة. ننتظرك في التحدّي القادم.'}</p></div><Button className="outline-button" onClick={()=>showClosedResults(closedWeek)}>شاهد النتائج</Button><button className="week-notice-close" aria-label="إغلاق إشعار نهاية الأسبوع" onClick={()=>setClosedWeek(null)}><X size={18}/></button></div>}
         <TabsContent value="home" className="page-stage">
           <WeeklyChallengeGate week={mission} isOpen={data.weekly.current?.id===mission?.id?data.weekly.ribbonOpen:undefined} onOpen={()=>{void refresh();}}>
           {mission?.drawingTheme!=='packaging-icons'&&<div className="workspace-label"><span>مشكلة واحدة · ثلاث زوايا</span><span lang="en" dir="ltr">FTC / IBTKR</span></div>}
-          {mission ? mission.drawingTheme==='packaging-icons'?<PackagingChallenge week={mission} onComplete={completePackaging} timeLeft={timeLeft}/>:<WeeklyChallengeView mission={mission} missionIndex={missionIndex} onSelectAngle={setMissionIndex} onStart={()=>start(mission)} onLeaderboard={()=>changeTab('leaderboard')} timeLeft={timeLeft} signedIn={data.signedIn} ownEntries={data.weekly.ownEntries} ownLikes={data.weekly.ownLikes}/> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
+          {mission ? mission.drawingTheme==='packaging-icons'?<PackagingChallenge week={mission} onComplete={completePackaging} timeLeft={timeLeft} review={data.weekly.review}/>:<WeeklyChallengeView mission={mission} missionIndex={missionIndex} onSelectAngle={setMissionIndex} onStart={()=>start(mission)} onLeaderboard={()=>changeTab('leaderboard')} timeLeft={timeLeft} signedIn={data.signedIn} ownEntries={data.weekly.ownEntries} ownLikes={data.weekly.ownLikes}/> : <section className="waiting-week"><Trophy size={36}/><span className="eyebrow">موعدنا مع تحدّي جديد</span><h1>الأسبوع القادم… زاوية جديدة.</h1><p>أُغلقت المشاركة والتصويت. نتائج الأسبوع محفوظة، والتحدّي القادم يظهر عند موعد نشره.</p><Button className="launch-button" onClick={()=>changeTab('leaderboard')}>نتائج الأسبوع</Button></section>}
           <Reveal className="community-preview section-block"><div className="section-heading"><div><span className="eyebrow">من المجتمع</span><h2>فكرة منك.<br/><span>وزاوية من غيرك.</span></h2></div><div className="section-aside"><p>اقرأ الحلول، ناقشها، وصوّت للفكرة اللي تلفتك.</p><button className="text-link" onClick={()=>{setWeekFilter('current');setAngleFilter('all');setSearch('');setPage(1);setFilter('all');changeTab('ideas')}}>شاهد المشاركات</button></div></div>{loading?<Skeleton className="feed-skeleton"/>:!data.signedIn?!error&&<SignInNotice href={signInHref({view:'ideas',...(findWeek(weekFilter)?{week:weekFilter}:{})})}/>:data.ideas.length?<div className="idea-grid">{ideaCards(data.ideas.slice(0,3))}</div>:<EmptyState onStart={()=>changeTab('home')}/>}</Reveal>
           </WeeklyChallengeGate>
         </TabsContent>
@@ -557,11 +559,12 @@ export default function InnovationApp() {
         <div className="form-field"><label htmlFor="idea-body">{compose?.submission==='drawing'?'فكرتك بجملة':'فكرتك'}{compose?.submission!=='drawing'&&<small>لا تحتاج إلى حل مكتمل</small>}</label><Textarea id="idea-body" disabled={busy} required minLength={compose?.submission==='drawing'?2:10} maxLength={compose?.submission==='drawing'?180:2000} rows={compose?.submission==='drawing'?2:4} value={draft.body} placeholder={compose?.drawingTheme==='warning-symbols'?'كيف يوضّح رمزك المعنى؟':compose?.submission==='drawing'?'كيف يشتغل تعديلك؟':'ما الذي ستغيّره؟ وكيف تعمل فكرتك؟'} aria-describedby="draft-helper" onChange={event=>setDraft({...draft,body:event.target.value,...(compose?.submission==='drawing'?{title:event.target.value.trim().slice(0,80)}:{})})}/></div>
         <div className="form-helper" id="draft-helper"><span>{editing?'تقدر تعدّل حتى إغلاق التحدّي.':'مسودتك تُحفظ على هذا الجهاز.'}</span><span dir="ltr">{draft.body.length} / {compose?.submission==='drawing'?180:2000}</span></div>
         {formError&&<p className="form-error" role="alert">{formError}</p>}
-        <div className="form-footer"><span><Lightbulb size={17}/> البداية أهم من الكمال</span>{data.signedIn?<Button className="launch-button" type="submit" disabled={busy||drawingLoading||drawingWorking}>{busy?'جارٍ الحفظ…':editing?'احفظ التطوير':compose?.submission==='drawing'?'شارك رسمتك':'شارك الفكرة'}<ArrowUpLeft size={20}/></Button>:<a className="launch-button signin-button" href={signInHref({view:tab,...(editing?{edit:draft.id}:{compose:compose?.id,angle:draft.angleId})})} target="_top">دخول للمشاركة <ArrowUpLeft size={20}/></a>}</div>
+        <div className="form-footer"><span><Lightbulb size={17}/> البداية أهم من الكمال</span>{data.weekly.review?<Button className="outline-button" type="button" onClick={()=>setCompose(null)}>إغلاق المعاينة</Button>:data.signedIn?<Button className="launch-button" type="submit" disabled={busy||drawingLoading||drawingWorking}>{busy?'جارٍ الحفظ…':editing?'احفظ التطوير':compose?.submission==='drawing'?'شارك رسمتك':'شارك الفكرة'}<ArrowUpLeft size={20}/></Button>:<a className="launch-button signin-button" href={signInHref({view:tab,...(editing?{edit:draft.id}:{compose:compose?.id,angle:draft.angleId})})} target="_top">دخول للمشاركة <ArrowUpLeft size={20}/></a>}</div>
       </form>
     </DialogContent></Dialog>
 
-    <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open && !busy) setSelected(null); }}><DialogContent className="ftc-dialog idea-dialog" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose>{active && <><div className="dialog-sequence"><span>من المجتمع</span><span>{angleLabel(active.angle_id,active.challenge_id)}</span></div><DialogTitle className="dialog-title">{active.title}</DialogTitle><DialogDescription className="idea-author">فكرة {active.name} · {date(active.created_at)}</DialogDescription>{active.drawingRevision&&<DrawingImage id={active.id} revision={active.drawingRevision} title={active.title}/>}<p className="full-idea">{active.body}</p><div className="idea-detail-actions">{!data.signedIn && <a className="text-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتشجيع والمشاركة <ArrowUpLeft size={18} /></a>}<button className={active.liked ? 'liked' : ''} aria-pressed={active.liked} disabled={busy || active.isOwn || !data.signedIn || currentChallenge()?.id!==active.challenge_id} title={active.isOwn ? 'هذه فكرتك؛ شجّع أفكار المشاركين الآخرين.' : undefined} onClick={() => void react(active)}><Heart size={18} fill={active.liked ? 'currentColor' : 'none'} />{active.likes} تشجيع</button>{active.isOwn && currentChallenge()?.id===active.challenge_id && <button onClick={() => start(findWeek(active.challenge_id)!, active)}><Pencil size={17} /> طوّر الفكرة</button>}</div><div className="comments-section"><h3>النقاش <span>{active.commentCount}</span></h3>{active.comments.length ? active.comments.map((entry) => <div className="comment" key={entry.id}><div><strong>{entry.name}</strong><time dateTime={entry.created_at}>{date(entry.created_at)}</time></div><p>{entry.body}</p></div>) : <p className="muted">سؤال صغير أو اقتراح منك قد يغيّر الفكرة.</p>}<PageControls page={data.discussion?.page??1} pages={data.discussion?.pages??1} onPage={setCommentPage}/><form onSubmit={saveComment} className="comment-form"><label htmlFor="comment-body">تعليقك</label><Textarea id="comment-body" disabled={busy} required minLength={5} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="سؤال أو اقتراح يحرّك الفكرة…" />{formError && <p className="form-error" role="alert">{formError}</p>}{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'أضف التعليق'} <MessageCircle size={18} /></Button> : <a className="launch-button signin-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتعليق <ArrowUpLeft size={18} /></a>}</form></div></>}</DialogContent></Dialog>
+    <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open && !busy) setSelected(null); }}><DialogContent className="ftc-dialog idea-dialog" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose>{active && <><div className="dialog-sequence"><span>من المجتمع</span><span>{angleLabel(active.angle_id,active.challenge_id)}</span></div><DialogTitle className="dialog-title">{active.title}</DialogTitle><DialogDescription className="idea-author">فكرة {active.name} · {date(active.created_at)}</DialogDescription>{active.drawingRevision&&<DrawingImage id={active.id} revision={active.drawingRevision} title={active.title}/>}<p className="full-idea">{active.body}</p><div className="idea-detail-actions">{!data.signedIn && <a className="text-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتشجيع والمشاركة <ArrowUpLeft size={18} /></a>}<button className={active.liked ? 'liked' : ''} aria-pressed={active.liked} disabled={busy || active.isOwn || !data.signedIn || currentChallenge()?.id!==active.challenge_id} title={active.isOwn ? 'هذه فكرتك؛ شجّع أفكار المشاركين الآخرين.' : undefined} onClick={() => void react(active)}><Heart size={18} fill={active.liked ? 'currentColor' : 'none'} />{active.likes} تشجيع</button>{active.isOwn && currentChallenge()?.id===active.challenge_id && <button onClick={() => start(findWeek(active.challenge_id)!, active)}><Pencil size={17} /> طوّر الفكرة</button>}</div><div className="comments-section"><h3>النقاش <span>{active.commentCount}</span></h3>{active.comments.length ? active.comments.map((entry) => <div className="comment" key={entry.id}><div><strong>{entry.name}</strong><time dateTime={entry.created_at}>{date(entry.created_at)}</time></div><p>{entry.body}</p></div>) : <p className="muted">سؤال صغير أو اقتراح منك قد يغيّر الفكرة.</p>}<PageControls page={data.discussion?.page??1} pages={data.discussion?.pages??1} onPage={setCommentPage}/><form onSubmit={saveComment} className="comment-form"><fieldset disabled={Boolean(data.weekly.review)} style={{border:0,padding:0,margin:0,width:'100%'}}>{data.weekly.review&&<p className="muted">النقاش متاح للقراءة أثناء المعاينة.</p>}<label htmlFor="comment-body">تعليقك</label><Textarea id="comment-body" disabled={busy} required minLength={5} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="سؤال أو اقتراح يحرّك الفكرة…" />{formError && <p className="form-error" role="alert">{formError}</p>}{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'أضف التعليق'} <MessageCircle size={18} /></Button> : <a className="launch-button signin-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتعليق <ArrowUpLeft size={18} /></a>}</fieldset></form></div></>}</DialogContent></Dialog>
   </>;
 }
+
 

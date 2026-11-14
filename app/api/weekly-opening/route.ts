@@ -1,4 +1,5 @@
 import { database } from '@/lib/database';
+import { committeeReviewEnabled } from '@/lib/committee-review.js';
 import { currentChallenge } from '@/lib/weekly';
 import { readWeeklyOpening,weeklyVisitor,cutWeeklyOpening } from '@/lib/weekly-opening';
 export const dynamic='force-dynamic';
@@ -11,6 +12,7 @@ export async function GET(request:Request){try{
   if(!visitor&&!state.isOpen){visitor=await weeklyVisitor(db,week,null,true);state=await readWeeklyOpening(db,week,visitor);return reply(state,200,visitor!);}return reply(state);
 }catch{return reply({error:'تعذّر تحميل شريط التحدّي. حاول مرة ثانية.'},503);}}
 export async function POST(request:Request){try{
+  if(committeeReviewEnabled)return reply({error:'المعاينة لا تغيّر قصّات الشريط الأصلية.'},403);
   const origin=request.headers.get('origin');if(request.headers.get('sec-fetch-site')==='cross-site'||(origin&&origin!==new URL(request.url).origin))return reply({error:'طلب غير مسموح.'},403);
   const week=currentChallenge();if(!week||new URL(request.url).searchParams.get('week')!==week.id)return reply({error:'تغيّر الأسبوع. حدّث الصفحة.'},409);
   const raw=await request.text();if(raw.length>1000)return reply({error:'طلب غير صالح.'},400);
@@ -19,3 +21,4 @@ export async function POST(request:Request){try{
   const db=database(),visitor=await weeklyVisitor(db,week,token(request));if(!visitor)return reply({error:'حدّث الصفحة لتجهيز قصّتك، بدون تسجيل دخول.'},409);
   return reply(await cutWeeklyOpening(db,week,visitor));
 }catch{return reply({error:'تعذّر حفظ القصّة. إعادة المحاولة لن تحسبها مرتين.'},503);}}
+
