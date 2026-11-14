@@ -505,7 +505,7 @@ export default function InnovationApp() {
       </div></header>
 
       <main className="workspace" id="main-content" data-activity-version={data.activityVersion} tabIndex={-1}>
-        {data.weekly.review&&<div className="week-change-notice" role="status"><div><strong>معاينة الأسبوع {mission?.number}</strong><p>جرّب تحدّي الرسم واستعرض المشاركات والنتائج الأصلية. النشر والتصويت مغلقان.</p></div></div>}
+        {data.weekly.review&&<div className="week-change-notice" role="status"><div><p>نظاما النشر والتصويت متوقفان مؤقتًا للحفاظ على نتائج الأسبوع أثناء تجربة الموقع.</p></div></div>}
         {error && <div className="system-banner error" role="alert"><span>{error}</span><button onClick={() => void refresh()}>إعادة المحاولة</button></div>}
         {closedWeek&&<div className="week-change-notice" role="status"><Trophy size={22}/><div><strong>انتهى تحدّي الأسبوع {closedWeek.number}.</strong><p>{data.weekly.current?'النتائج محفوظة، والتحدّي الجديد جاهز.':'النتائج محفوظة. ننتظرك في التحدّي القادم.'}</p></div><Button className="outline-button" onClick={()=>showClosedResults(closedWeek)}>شاهد النتائج</Button><button className="week-notice-close" aria-label="إغلاق إشعار نهاية الأسبوع" onClick={()=>setClosedWeek(null)}><X size={18}/></button></div>}
         <TabsContent value="home" className="page-stage">
