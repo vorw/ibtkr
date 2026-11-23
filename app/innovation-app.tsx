@@ -1,5 +1,10 @@
 'use client';
 
+// Main participant interface and form coordinator. It loads the community API,
+// selects a challenge experience, and keeps local drafts separate from saved entries.
+// The server owns account, ownership and deadline enforcement.
+
+
 import OpeningGate, { SitePreviewContext } from './opening-gate';
 import { weeklyRibbonFor } from '@/lib/weekly-ribbon-policy';
 import DrawingStudio, { DrawingImage,readDrawing } from './drawing-studio';
@@ -197,6 +202,7 @@ export default function InnovationApp() {
   if(selected)queryRef.current.set('idea',selected);
   const queryKey=queryRef.current.toString();
 
+  // Ignore late responses from older queries so filters cannot show stale results.
   const refresh = useCallback(async (): Promise<AppData | null> => {
     if (mutationLock.current) return null;
     const version = ++refreshVersion.current;
@@ -385,6 +391,7 @@ export default function InnovationApp() {
       : { id: newId(), title: '', body: '',angleId };
     setDraft({...value,angleId:value.angleId??angleId}); setCompose(challenge);
   }
+  // The activity returns a local image. Review opens a preview, never a new entry.
   function completePackaging(result:PackagingResult){
     if(!mission||mission.drawingTheme!=='packaging-icons'||(!data.weekly.review&&currentChallenge()?.id!==mission.id)){toast.error('أُغلق التحدّي. رسمتك محفوظة على جهازك.');return;}
     const task=packagingTasks[result.task];if(!task)return;
@@ -410,6 +417,7 @@ export default function InnovationApp() {
     if (caught instanceof SignInRequired) setData(current => ({ ...current, signedIn: false }));
     return caught instanceof Error ? caught.message : 'تعذّر الحفظ. مسودتك باقية.';
   }
+  // Only a confirmed API response replaces the displayed saved community state.
   async function mutate(body: unknown) {
     ++refreshVersion.current;
     const result = await requestCommunity(body,queryRef.current,openingPreview) as { community?: AppData; ideaId?: string };
@@ -566,5 +574,6 @@ export default function InnovationApp() {
     <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open && !busy) setSelected(null); }}><DialogContent className="ftc-dialog idea-dialog" dir="rtl" showCloseButton={false} onCloseAutoFocus={restoreFocus}><DialogClose disabled={busy} className="dialog-close" aria-label="إغلاق"><X size={20} /></DialogClose>{active && <><div className="dialog-sequence"><span>من المجتمع</span><span>{angleLabel(active.angle_id,active.challenge_id)}</span></div><DialogTitle className="dialog-title">{active.title}</DialogTitle><DialogDescription className="idea-author">فكرة {active.name} · {date(active.created_at)}</DialogDescription>{active.drawingRevision&&<DrawingImage id={active.id} revision={active.drawingRevision} title={active.title}/>}<p className="full-idea">{active.body}</p><div className="idea-detail-actions">{!data.signedIn && <a className="text-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتشجيع والمشاركة <ArrowUpLeft size={18} /></a>}<button className={active.liked ? 'liked' : ''} aria-pressed={active.liked} disabled={busy || active.isOwn || !data.signedIn || currentChallenge()?.id!==active.challenge_id} title={active.isOwn ? 'هذه فكرتك؛ شجّع أفكار المشاركين الآخرين.' : undefined} onClick={() => void react(active)}><Heart size={18} fill={active.liked ? 'currentColor' : 'none'} />{active.likes} تشجيع</button>{active.isOwn && currentChallenge()?.id===active.challenge_id && <button onClick={() => start(findWeek(active.challenge_id)!, active)}><Pencil size={17} /> طوّر الفكرة</button>}</div><div className="comments-section"><h3>النقاش <span>{active.commentCount}</span></h3>{active.comments.length ? active.comments.map((entry) => <div className="comment" key={entry.id}><div><strong>{entry.name}</strong><time dateTime={entry.created_at}>{date(entry.created_at)}</time></div><p>{entry.body}</p></div>) : <p className="muted">سؤال صغير أو اقتراح منك قد يغيّر الفكرة.</p>}<PageControls page={data.discussion?.page??1} pages={data.discussion?.pages??1} onPage={setCommentPage}/><form onSubmit={saveComment} className="comment-form"><fieldset disabled={Boolean(data.weekly.review)} style={{border:0,padding:0,margin:0,width:'100%'}}>{data.weekly.review&&<p className="muted">النقاش متاح للقراءة أثناء المعاينة.</p>}<label htmlFor="comment-body">تعليقك</label><Textarea id="comment-body" disabled={busy} required minLength={5} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="سؤال أو اقتراح يحرّك الفكرة…" />{formError && <p className="form-error" role="alert">{formError}</p>}{data.signedIn ? <Button className="launch-button" type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'أضف التعليق'} <MessageCircle size={18} /></Button> : <a className="launch-button signin-link" href={signInHref({ view: tab, idea: active.id })} target="_top">دخول للتعليق <ArrowUpLeft size={18} /></a>}</fieldset></form></div></>}</DialogContent></Dialog>
   </>;
 }
+
 
 

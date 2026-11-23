@@ -1,3 +1,6 @@
+// Cloudflare entry point. Maintenance can replace HTTP responses. The scheduled
+// path exits during review/maintenance, otherwise finalizes weeks and processes emails.
+
 import handler from 'vinext/server/fetch-handler';
 import { committeeReviewEnabled } from './lib/committee-review.js';
 import { finalizeClosedWeeks } from './lib/weekly-db';
@@ -16,4 +19,5 @@ export default {
     await runWeeklyEmailJob(env);
   },
 };
+
 

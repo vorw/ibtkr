@@ -1,4 +1,8 @@
 'use client';
+
+// Bridge between the embedded two-minute activity and the main contribution
+// form. Review attempts use separate local storage and cannot publish.
+
 import { useEffect,useMemo,useRef,useState } from 'react';
 import type { WeeklyChallenge } from '@/lib/weekly';
 import { packagingGameHtml,packagingTasks } from '@/lib/packaging-game';
@@ -25,4 +29,5 @@ export default function PackagingChallenge({week,onComplete,timeLeft,review=fals
   },[]);
   return <section aria-label="تحدّي رموز التغليف"><div className="workspace-label"><span>الأسبوع {week.number} · تحدّي الرسم</span><span>{review?'معاينة · دقيقتان للرسم':<>ينتهي الجمعة ١١:٥٩ م · {timeLeft}</>}</span></div><iframe ref={frame} srcDoc={html} title="رسالة على علبة · دقيقتان للرسم" style={{display:'block',width:'100%',height,border:0,background:'var(--background)'}} /></section>;
 }
+
 

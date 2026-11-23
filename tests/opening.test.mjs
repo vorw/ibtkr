@@ -3,7 +3,7 @@ import { test,beforeEach,afterEach,after,mock } from 'node:test';
 import { registerHooks } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { state,resetDatabase,database } from './community-fixture.mjs';
-registerHooks({resolve(s,c,next){const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
+registerHooks({resolve(s,c,next){if(s.endsWith('/committee-review.js'))return {url:'data:text/javascript,export const committeeReviewEnabled=false;export const committeeReviewWeekId=null;',shortCircuit:true};const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
 registerHooks({resolve(s,c,next){
   const aliases={'@/lib/auth-server':'./community-fixture.mjs','@/lib/database':'./community-fixture.mjs',
     '@/lib/weekly-opening':'../lib/weekly-opening.ts','./weekly-ribbon-policy':'../lib/weekly-ribbon-policy.ts',
@@ -155,3 +155,4 @@ test('lowering an existing target keeps all cuts and opens immediately if alread
     assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,count);
   }
 });
+

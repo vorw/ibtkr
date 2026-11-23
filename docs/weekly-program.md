@@ -1,67 +1,46 @@
-# Weekly challenge programme
+# Weekly programme
 
-## Participant flow
+## What a week means
 
-- The main tab is **تحدّي الأسبوع**, replacing **البداية**. The tasks tab and three-problem selector are removed.
-- One problem has **غيّر القاعدة**, **اقلب الفكرة**, and **ماذا لو؟**. Each angle has its own prompt and hint, all addressing the same problem.
-- A participant can submit multiple independent solutions, choose an angle for every entry, and edit their entries or change the angle while the week is open.
-- Voting is one like per other participant’s idea. Participants cannot like their own entries. Likes across all entries are summed for the participant’s weekly score.
-- Ranking uses shared ranks for equal scores. All first-place participants with at least one like are weekly winners; zero likes do not create a winner.
-- Closed weeks preserve their result. Creating, editing and changing votes are locked; archive discussion remains available.
-- Lifetime XP is separate: 20 XP for the first participation in a week and 5 XP for the first comment on each other participant’s idea, excluding reset legacy participation.
+A challenge has a stable `id`, visible `number`, title, description, start/end timestamps and three stored angle IDs. It may accept text or a drawing. Some formats, such as packaging icons, provide their own interaction instead of the normal angle selector.
 
-## Schedule
+`lib/weekly.ts` is the source of truth for scheduled weeks. `lib/weekly-content.ts` supplies prepared written prompts, with drawing-specific content substituted in `weekly.ts` where needed. Prepared content is not evidence that every week has been announced or played.
 
-The close is Friday 11:59 PM Riyadh. Technically the end boundary is exclusive Saturday 00:00 Riyadh / Friday 21:00 UTC. The next scheduled week becomes active at that boundary. The Worker cron at `*/5 * * * *` includes that exact close, finalizes completed weeks and processes weekly congratulations; API reads provide an idempotent finalization fallback if a cron is delayed. See [weekly emails](weekly-emails.md) for activation, delivery rules and recovery.
+The current twenty-week schedule starts **10 October 2026 at 00:00 Riyadh** and its last week closes **27 February 2027 at 00:00 Riyadh**. The code validates contiguous seven-day windows. Date-shaped IDs retain their historical spelling and do not represent the actual start date.
 
-The official launch schedule starts at **week 01** and includes **20 weeks**, from 7 October 2026 through the final close on 20 February 2027 (Riyadh time). Each has three distinct prompts and hints. The original two upcoming challenges are retained and 18 more are defined in `lib/weekly-content.ts`.
+## Implemented examples
 
-| Challenge | Riyadh start | Riyadh end (exclusive) |
-| --- | --- | --- |
-| Clear subscription cancellation | 7 October 2026, 00:00 | 10 October 2026, 00:00 |
-| Arriving alone at an event | 10 October 2026, 00:00 | 17 October 2026, 00:00 |
+| Week | Stable ID | Experience | Riyadh window, end exclusive |
+| --- | --- | --- | --- |
+| 01 | `week-2026-10-14` | Subscription cancellation, written solutions | 10–17 October 2026 |
+| 02 | `week-2026-10-21` | Try before buying, written solutions | 17–24 October 2026 |
+| 03 | `week-2026-10-28` | Redesign a car warning icon, drawing | 24–31 October 2026 |
+| 05 | `week-2026-11-11` | Packaging icons, two-minute drawing activity | 7–14 November 2026 |
 
-`lib/weekly.ts` combines the existing weeks and prepared content into a validated contiguous schedule. Add reviewed future problems before their start; never recycle identifiers or alter past weeks. Each problem must have three unique angle IDs and a seven-day interval beginning Saturday midnight Riyadh. Week 01 is the sole transition exception: its original 7 October start is preserved and it closes on 10 October. Existing date-based IDs stay unchanged to preserve entries, archives, drafts and email deduplication; they no longer identify the actual start date. If this finite batch runs out, the home shows a waiting state and past results remain available. It does not reuse a closed problem.
+The cup challenge remains a comparison preview. It is not the official week 03 content. Week 05 is currently pinned for committee review, while the calendar continues to use real timestamps internally.
 
-At the deadline, an already-open homepage refreshes against the server clock and shows a dismissible notice linking to the closed week's results. The new problem appears with no angle selected. An open composer for the closed week is dismissed, and its local draft stays attached to that week rather than being submitted to the new challenge. Requests made after the deadline are rejected by the server. Each week starts with its own participation and likes; accounts, official archived entries and lifetime XP remain intact. The next week does not wait for email delivery. Frozen eligible results enter the email outbox and the five-minute scheduled job sends the approved individual congratulations with repeat protection.
+## Closing time
 
-## Community organization
+Normal participation and voting continue through Friday **23:59:59.999 Riyadh**. The exclusive end is Saturday **00:00 Riyadh**, which is Friday **21:00 UTC**.
 
-The community uses 12-entry pages, search across title/body/author, week and angle filters, newest/most-liked sorting, and an all/my-participations switch. Rankings use 20-participant pages; discussions use 20-comment pages. Individual saved ideas can be opened even when they are outside the visible filtered page. This replaces the former latest-100 limit.
+At that boundary, new submissions, edits and vote changes for the old week are rejected. Server and database clocks enforce the boundary even if a browser was left open. The next scheduled challenge becomes current without waiting for emails. If the finite schedule runs out, the site shows a waiting state.
 
-The user requested removal of previous `queue`, `reverse` and `alone` participation. Migration 0003 removes those posts, their comments/likes and obsolete results in one guarded transaction, then records the reset in the migration ledger. Profiles, auth accounts, new weekly posts and their rewards remain intact. Old and previously migrated local drafts are cleared without clearing login tokens. The obsolete previous-programme filter is removed; completed weekly archives remain available.
+## Scores, ties and XP
 
-## Data and release
+- A participant's weekly score is the total genuine likes on all their contributions to that challenge, across angles.
+- An account can like each other participant's idea once. Self-likes do not count.
+- Ranking uses SQL `RANK()`: scores `5, 5, 3` produce ranks `1, 1, 3`.
+- Congratulations eligibility is **frozen rank 1–3 with positive likes**, including ties. Zero likes never creates an eligible winner. Ties may produce more than three recipients or skip a rank.
+- Lifetime XP is separate: 20 XP for first participation in a challenge, and 5 XP for the first comment on each other person's idea.
 
-`drizzle/0002_weekly_challenges.sql` adds the angle field, feed indexes, frozen weekly results and finalization markers. It does not delete or reassign existing data. Finalization inserts rankings and the marker in one transactional D1 batch and is repeat-safe. Server-side clock guards prevent late entry/edit/vote writes even if the client remains open at the cutoff.
+## Freezing and archives
 
-The production target is the existing Cloudflare Worker `ibtkr`, D1 `ibtkr-community` and domain `ibtkr.space`, connected to GitHub `main`. Do not deploy to the former Sites project.
+`finalizeClosedWeeks()` writes a closed week's ranking and its finalization marker in one atomic batch. Repeating the operation does not replace the snapshot. It normally runs from the scheduled job, with community reads providing a fallback.
 
-Merge the verified GitHub release to `main` to use the existing connected Cloudflare build. `ensureWeeklySchema` imports the real 0002 SQL migration, applies it in a transactional D1 batch before weekly queries, and records it in the standard Wrangler migration ledger. Already-applied schema and concurrent first requests are handled safely. A failed upgrade rolls back and remains retryable. Migration 0003 then applies the user-authorized legacy reset, including on GitHub-only deployments. Its marker and deletions are atomic; failed resets roll back and retry, while concurrent instances cannot reset new weekly data.
+Archived contributions and final rankings remain linked to their original week. Discussion can remain open in normal mode, but committee review also blocks new comments. A new week does not reset account profiles or lifetime progress.
 
-An authenticated CLI release remains available:
+## Changing future content
 
-```sh
-pnpm install --frozen-lockfile
-pnpm test:community
-pnpm test:auth
-pnpm exec tsc --noEmit
-pnpm deploy
-```
+Add or update reviewed **future** challenges before their opening date. Keep old IDs, dates and stored angle identifiers stable. Never reuse an old ID for a different problem.
 
-`pnpm deploy` builds, applies remote migrations and then deploys the Worker. The automatic Worker upgrade also covers deployments that only publish code. Confirm the scheduled handler and cron configuration after deployment. No deployment credentials are stored in source.
-
-## Verification
-
-The isolated SQLite tests use the real migrations and route handlers. They cover multi-angle submissions, ownership, retry recovery, deadline enforcement, vote uniqueness, cumulative scores and ties, account preservation and legacy cleanup, 126-entry pagination, 140-participant rankings, 55-comment pagination, frozen results and exact Riyadh week rollover. No production accounts or data are used.
-
-The weekly release was verified on the live homepage, three-angle switching, challenge details, public rankings and guest community filters. Signed-in writes and account preservation are covered by the isolated automated suite. Mobile visual review remains a manual check.
-
-## Platform references
-
-- [D1 batch execution](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch)
-- [Cron triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
-
-## Official launch reset — 7 October 2026
-
-The September 30 round was testing. Migration 0005 moves its ideas, comments, likes, rankings and finalization record into private `launch_test_archive_*` tables in a guarded atomic batch, then clears that round from active tables. Its activity no longer earns XP or appears in public archives. Profiles and authentication stay intact, and October 7 activity is preserved. The twenty existing prepared challenges keep their date IDs and are numbered 01–20. Test drafts are cleared; official drafts and login sessions are retained. Sent test email receipts are kept, with no replay. Official congratulations start at the first real close, 10 October 2026 at 00:00 Riyadh.
+A new interaction needs both content and an appropriate UI implementation. Follow [Portal handover](portal-handoff.md) and [Drawing experiences](drawings.md) rather than assuming that editing question text changes the interaction.

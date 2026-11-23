@@ -1,2 +1,9 @@
-import {env} from 'cloudflare:workers';
-export function database():D1Database{const db=(env as unknown as {DB?:D1Database}).DB;if(!db)throw new Error('Database unavailable');return db;}
+// Returns the existing Cloudflare D1 binding. Supabase is used for sign-in,
+// not for these application tables.
+
+import { env } from 'cloudflare:workers';
+export function database(): D1Database {
+  const db = (env as unknown as { DB?: D1Database }).DB;
+  if (!db) throw new Error('Database unavailable');
+  return db;
+}

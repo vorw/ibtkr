@@ -1,26 +1,40 @@
-# Weekly community verification — 5 October 2026
+# Testing and safe review
 
-The weekly flow and release boundary are documented in [weekly-program.md](weekly-program.md).
-
-## Automated checks
-
-Run these with Node 24 after installing the locked dependencies:
+## Run the complete isolated suite
 
 ```sh
-pnpm test:community
-pnpm test:auth
+pnpm test
+```
+
+Use Node 24 after installing the declared dependencies. The suite uses in-memory SQLite, fixture identities, simulated clocks and mocked network responses. It does not need production Supabase, D1 or Resend credentials and does not send real emails.
+
+| Test group | What it checks |
+| --- | --- |
+| `auth` | Remote identity verification, invalid/spoofed tokens and safe return URLs |
+| `community` | Profile uniqueness, ownership, submissions, votes, comments, retries, pagination, cutoffs and frozen ranks |
+| `drawing` | Image validation, account-protected reads and atomic drawing writes |
+| `opening`, `weekly-opening` | Anonymous visitor cookies, repeat cuts, targets and concurrent opening |
+| `weekly-email` | Eligible frozen ranks, positive likes, ties, leases, retry safety and templates |
+| `packaging` | Hidden tasks, 120-second timer, two skips, refresh recovery and separate review storage |
+| `committee-review` | Pinned week, original rankings, closed writes and paused background work |
+| `maintenance` | Active-time boundaries, API blocking and automatic expiry |
+| Audio/prototype/identity checks | Unpitched sound, isolated experiments and shared visual structure |
+
+Normal-mode suites replace the temporary review configuration with an inactive fixture. The dedicated review suite uses the actual review configuration. This keeps a temporary deployment setting from changing what the normal-mode tests are testing.
+
+## Static and build checks
+
+```sh
 pnpm exec tsc --noEmit
 pnpm build
 ```
 
-The combined authentication and community suite has 40 checks, using isolated identities and in-memory SQLite created from all real migrations. Coverage includes server-verified identity, safe login return context, profile validation, multi-angle entries, author-only editing, exact retry recovery, self-vote rejection, duplicate voting, weekly totals, tied ranks, cutoff guards including in-flight writes, archive access, escaped search, large feeds, 140-participant ranking pages, long discussion pages, frozen results, Saturday rollover in Riyadh, automatic legacy-schema upgrades, concurrent first requests, full rollback/retry after an upgrade failure, account-preserving legacy resets, concurrency safety, and scoped browser draft cleanup.
+A build checks packaging; it does not prove that production service bindings or email delivery are healthy. Some UI tests inspect source structure, so a large presentation refactor may need corresponding test maintenance.
 
-## Browser checks still required
+## Manual review
 
-Check the actual application at phone and desktop sizes in both themes. Verify main-tab naming, removal of the tasks tab, angle transitions and hints, multiple submissions and editing, sign-in/draft recovery, week/angle/search filters, community and ranking pagination, comments, end-of-week locks, shared winners and empty/waiting states. Confirm the brand reads **FTC / IBTKR**.
+Use phone and desktop layouts, both themes and reduced motion. Check navigation, readable Arabic alignment, challenge selection, timer reveal, drawing tools, normal sign-in, saved images, filters, archive selection and tied rankings.
 
-Browser layout verification was not completed in this environment. Automated route checks and a successful build do not substitute for this check.
+In the current committee review, check that the original week 05 leaderboard appears and publishing/voting remain closed. Do not use real student accounts to create test submissions or manually trigger winner messages.
 
-## Production boundary
-
-Preserve the existing Cloudflare database and Supabase authentication. GitHub `main` triggers the connected release; the Worker automatically applies and records additive migration 0002 before weekly queries. CLI deployments still apply migrations before publishing. Confirm the five-minute scheduled handler includes the Friday 21:00 UTC close. Migration 0003 implements the user-authorized deletion of old three-problem activity while preserving accounts, profiles, new weekly activity and login tokens. Completed weekly entries stay archived. For congratulations, verify migration 0004 and the two secret bindings described in [weekly emails](weekly-emails.md), and run `pnpm test:weekly-email`.
+For future normal-mode write testing, use a separate development database and test accounts. Maintain the production migration ledger and keep the live dataset out of fixtures and screenshots.

@@ -1,5 +1,9 @@
 'use client';
 
+// Reusable free-drawing/upload editor. It produces a small raster draft;
+// saving a contribution is handled separately by the parent form and API.
+
+
 import { useEffect,useRef,useState,type PointerEvent } from 'react';
 import { Pencil,Eraser,Undo2,Upload,ImagePlus,Check,LoaderCircle } from 'lucide-react';
 import { sessionHeaders } from '@/lib/auth-client';
@@ -84,3 +88,4 @@ export default function DrawingStudio({value,onChange,disabled=false,onBusyChang
     {error&&<p className="form-error" role="alert">{error}</p>}
   </section>;
 }
+

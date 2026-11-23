@@ -1,3 +1,6 @@
+// Anonymous weekly-ribbon endpoint. The week must match the current calendar;
+// committee review rejects cuts so historical opening records stay unchanged.
+
 import { database } from '@/lib/database';
 import { committeeReviewEnabled } from '@/lib/committee-review.js';
 import { currentChallenge } from '@/lib/weekly';
@@ -21,4 +24,5 @@ export async function POST(request:Request){try{
   const db=database(),visitor=await weeklyVisitor(db,week,token(request));if(!visitor)return reply({error:'حدّث الصفحة لتجهيز قصّتك، بدون تسجيل دخول.'},409);
   return reply(await cutWeeklyOpening(db,week,visitor));
 }catch{return reply({error:'تعذّر حفظ القصّة. إعادة المحاولة لن تحسبها مرتين.'},503);}}
+
 

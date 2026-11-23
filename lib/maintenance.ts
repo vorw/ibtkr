@@ -1,17 +1,24 @@
 import { committeeReviewEnabled } from './committee-review.js';
 
-// Temporary pause. Expiry is evaluated per request and cron invocation;
-// normal operation resumes without another deployment or a new scheduled task.
+// A time-bounded exam pause, checked for each request and scheduled invocation.
+// Committee review bypasses this page. These dates describe a past window;
+// a later pause needs a deliberately updated start/end pair.
 export const MAINTENANCE_STARTS_AT = '2026-11-13T20:59:00.000Z';
 export const MAINTENANCE_ENDS_AT = '2026-11-20T21:00:00.000Z';
 
 export function isMaintenanceActive(now = Date.now()): boolean {
-  return !committeeReviewEnabled && now >= Date.parse(MAINTENANCE_STARTS_AT) && now < Date.parse(MAINTENANCE_ENDS_AT);
+  return (
+    !committeeReviewEnabled &&
+    now >= Date.parse(MAINTENANCE_STARTS_AT) &&
+    now < Date.parse(MAINTENANCE_ENDS_AT)
+  );
 }
 
 const maintenanceAssets = new Set([
-  '/assets/ftc-logo.svg', '/favicon.svg',
-  '/fonts/plex-arabic-regular.woff2', '/fonts/plex-arabic-medium.woff2',
+  '/assets/ftc-logo.svg',
+  '/favicon.svg',
+  '/fonts/plex-arabic-regular.woff2',
+  '/fonts/plex-arabic-medium.woff2',
 ]);
 
 export const maintenanceHtml = `<!doctype html>
@@ -66,26 +73,52 @@ footer{padding-block:23px;border-top:1px solid #e0dce9;color:#81788e;font-size:1
 </div></main><footer><span>ابتكر · لجنة الابتكار — نادي تقنية المستقبل</span><span class="saved">مشاركاتكم ونتائجكم السابقة محفوظة.</span></footer>
 </body></html>`;
 
-export function maintenanceResponse(request: Request, now = Date.now()): Response | null {
+export function maintenanceResponse(
+  request: Request,
+  now = Date.now(),
+): Response | null {
   if (!isMaintenanceActive(now)) return null;
   const path = new URL(request.url).pathname;
-  if ((request.method === 'GET' || request.method === 'HEAD') && maintenanceAssets.has(path)) return null;
+  if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    maintenanceAssets.has(path)
+  )
+    return null;
   const headers = {
     'Cache-Control': 'no-store, max-age=0',
     'Retry-After': new Date(MAINTENANCE_ENDS_AT).toUTCString(),
     'X-Content-Type-Options': 'nosniff',
   };
-  if (path === '/api' || path.startsWith('/api/') || !['GET', 'HEAD'].includes(request.method)) {
-    return new Response(request.method === 'HEAD' ? null : JSON.stringify({
-      error: 'ابتكر في وقفة لأسبوع الاختبارات. نعود السبت ٢١ نوفمبر. الله يوفقكم.',
-      code: 'maintenance', resumesAt: MAINTENANCE_ENDS_AT,
-    }), { status: 503, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
+  if (
+    path === '/api' ||
+    path.startsWith('/api/') ||
+    !['GET', 'HEAD'].includes(request.method)
+  ) {
+    return new Response(
+      request.method === 'HEAD'
+        ? null
+        : JSON.stringify({
+            error:
+              'ابتكر في وقفة لأسبوع الاختبارات. نعود السبت ٢١ نوفمبر. الله يوفقكم.',
+            code: 'maintenance',
+            resumesAt: MAINTENANCE_ENDS_AT,
+          }),
+      {
+        status: 503,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      },
+    );
   }
   return new Response(request.method === 'HEAD' ? null : maintenanceHtml, {
-    status: 503, headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8',
-      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    status: 503,
+    headers: {
+      ...headers,
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy':
+        "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     },
   });
 }
-
-

@@ -1,19 +1,32 @@
-# Official ribbon opening — 15 anonymous participants
+# Opening ribbons
 
-The official event is `ibtkr-official-opening-2026-10-07`, with target 15 and enabled true in `lib/opening.ts`. It starts fresh; earlier rehearsal events and contributions remain intact. Fifteen accepted cuts open the site globally and permanently. Waiting visitors see the ribbon release, unpitched effects and celebration; new arrivals go straight to the site. Weekly dates, XP, challenges, authenticated idea/vote operations and winner emails remain independent.
+There are two separate ribbon events. They use the same interaction, but opening one does not reset or open the other.
 
-No login is needed for cutting. `/api/opening` ignores authentication headers and does not call Supabase. A first same-origin GET issues a random server-generated visitor UUID in `__Host-ibtkr-opening`, with HttpOnly, Secure, SameSite=Strict, Path=/ and a 30-day lifetime. The UUID must exist in `opening_visitors` for the current event before a cut is accepted. Missing, fabricated and old-event tokens cannot contribute. The client serializes refresh requests so overlapping initial reads cannot replace a newly issued visitor cookie.
+| Event | Current configuration | Purpose |
+| --- | --- | --- |
+| Whole-site launch | `lib/opening.ts`: event `ibtkr-official-opening-2026-10-10-reset-1`, target **10** | The original launch ceremony |
+| Weekly challenge | `lib/weekly-ribbon-policy.ts`: target **5** | Reveal a new weekly question while other sections remain available |
 
-Each browser cookie can contribute once. This is browser uniqueness, not verified human uniqueness: clearing cookies, private browsing or another browser/device allows another participant token. Shared browsers share one contribution. There is no fingerprinting or IP-address collection in this feature. New arrivals after opening receive no new visitor cookie. Browser cookie blocking prevents participation and shows a reload instruction rather than asking for a login.
+Old rehearsal events and accepted cuts are retained. Changing a target must not delete cuts or replace an existing opening timestamp. A read can open an unopened event that already has enough accepted cuts.
 
-D1 stores anonymous accepted cuts in `opening_cuts`, retaining its historical `user_id` column name for compatibility; official entries contain opaque visitor UUIDs, not account IDs. The atomic batch inserts one unique event/visitor cut, caps the total at 15 and sets the opening timestamp. The accepted insertion order derives from SQLite rowid within the event, so positions 1–15 remain distinct even with equal timestamps. The API returns only the current browser's private position, the shared count and gate state, never the other visitor IDs or any contact details.
+## Anonymous participation
 
-This automatically preserves the first 15 cut records and times, but does not identify their people. A future optional name/consent form can associate a chosen name with the existing visitor's accepted position. Names should be voluntary, public display should require consent, and cutting should remain available without entering a name. No such form is deployed in this release.
+Cutting does not require a user account. A same-origin GET can create an opaque visitor UUID in a secure, HttpOnly, SameSite=Strict cookie. A cut is accepted only for a known visitor in the correct event. Each event/visitor pair can contribute once. Atomic database statements cap the count and set the opening timestamp safely under concurrent requests.
 
-The live counter uses 15 compact progress cells. Cut positions stay inside the screen edges on mobile. Pointer drag, keyboard and tap alternatives use the same endpoint. `/opening-preview` remains a two-participant visual rehearsal with local state only, no API calls and no real contributions. Reloading restarts it. The sounds contain only noise-buffer scissors scrapes, cloth tearing, air and irregular applause-style claps; no pitched tones, oscillators or music. Reduced-motion mode disables decorations and shortens the reveal.
+This is **browser-token uniqueness**, not proof of one human per cut. Clearing cookies or using another device can create another token. Shared browsers share a token. The feature does not collect fingerprints or IP addresses to solve that limitation.
 
-Validation covers anonymous cookie issuance, repeat clicks/refresh/sign-in, ordering with tied timestamps, 40 concurrent cuts stopping at 15, forged cookies and cross-site requests, account-free records, community closure through 14 cuts and opening at 15, transactional rollback/retry, preserving past events, and no new visitor records after opening. Community/auth/weekly-email/audio suites, TypeScript and the production build are also required before publishing.
+Only the current browser's private cut position is returned. Other visitor tokens and contact details are not exposed. An accepted cut records a position/time, not the person's name or account. No optional identity-registration form is implemented.
 
-## Local site preview
+## What happens after opening
 
-An invisible 40×40 pixel button at the physical top-right corner of the live opening page reveals the site locally, with no cut request or change to the opening event. It is not rendered in the isolated two-cut rehearsal. Refreshing restores the public ceremony. The preview uses the real current challenge and ordinary account verification; guests still cannot read signed-in idea content. Community GET requests opt into this read-only preview with `openingPreview=1`. The flag grants no leader identity or special account access. Preview POST requests are rejected, and ordinary writes still require the global opening and existing authentication. No browser storage, preview cookie, database migration, launch reset or mail send is involved.
+Waiting visitors see the ribbon release. Later visits skip the completed ceremony. Refreshing a finished weekly opening must not flash the old wrapper. The weekly opening affects the question, while the community, leaderboard and profile navigation remain available under their normal rules.
+
+Committee review reveals the pinned question without changing stored cuts and rejects weekly cut writes. Real sign-in is still required to read private community content.
+
+## Local preview and accessibility
+
+`/opening-preview` is a two-participant visual rehearsal with local state. It does not add production cuts. The original opening page also has a small invisible top-right preview control. This is a local presentation shortcut, not a privileged account or an access-control mechanism. Its `openingPreview=1` community requests are read-only.
+
+Pointer, tap and keyboard alternatives use the same server rules. Reduced motion limits decorations. Audio uses unpitched physical effects such as scissors, cloth, air and applause-style noise. It does not include music or pitched instruments.
+
+See `tests/opening.test.mjs`, `tests/weekly-opening.test.mjs` and the audio suites for cookie, cutoff, concurrency and accessibility-related behaviour.

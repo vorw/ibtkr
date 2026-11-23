@@ -1,3 +1,6 @@
+// Community API entry point. Reads keep normal account rules; writes validate
+// origin, identity, ownership, payload shape and the real weekly cutoff.
+
 import { getParticipant } from '@/lib/auth-server';
 import { committeeReviewEnabled } from '@/lib/committee-review.js';
 import { database } from '@/lib/database';
@@ -261,4 +264,5 @@ export async function POST(request: Request) {
     return reply({ error: 'ما تأكدنا من الحفظ. كلامك موجود؛ جرّب مرة ثانية ولن تتكرر المشاركة.' }, 503);
   }
 }
+
 

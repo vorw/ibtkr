@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {state,resetDatabase,database} from './community-fixture.mjs';
 import {jpeg} from './drawing-fixture.mjs';
-registerHooks({resolve(s,c,next){const p={'@/lib/database':'./community-fixture.mjs','@/lib/auth-server':'./community-fixture.mjs','@/lib/opening':'../lib/opening.ts','@/lib/weekly':'../lib/weekly.ts','@/lib/weekly-opening':'../lib/weekly-opening.ts','@/lib/challenges':'../lib/challenges.ts','@/lib/profile':'../lib/profile.ts','@/lib/community-read':'../lib/community-read.ts','@/lib/weekly-schema':'../lib/weekly-schema.ts','@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts','./weekly-ribbon-policy':'../lib/weekly-ribbon-policy.ts','./weekly':'../lib/weekly.ts','./weekly-content':'../lib/weekly-content.ts','./weekly-db':'../lib/weekly-db.ts'};return p[s]?{url:new URL(p[s],import.meta.url).href,shortCircuit:true}:next(s,c);},load(url,c,next){return url.endsWith('.sql?raw')?{format:'module',source:'export default '+JSON.stringify(readFileSync(new URL(url),'utf8'))+';',shortCircuit:true}:next(url,c);}});
+registerHooks({resolve(s,c,next){if(s.endsWith('/committee-review.js'))return {url:'data:text/javascript,export const committeeReviewEnabled=false;export const committeeReviewWeekId=null;',shortCircuit:true};const p={'@/lib/database':'./community-fixture.mjs','@/lib/auth-server':'./community-fixture.mjs','@/lib/opening':'../lib/opening.ts','@/lib/weekly':'../lib/weekly.ts','@/lib/weekly-opening':'../lib/weekly-opening.ts','@/lib/challenges':'../lib/challenges.ts','@/lib/profile':'../lib/profile.ts','@/lib/community-read':'../lib/community-read.ts','@/lib/weekly-schema':'../lib/weekly-schema.ts','@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts','./weekly-ribbon-policy':'../lib/weekly-ribbon-policy.ts','./weekly':'../lib/weekly.ts','./weekly-content':'../lib/weekly-content.ts','./weekly-db':'../lib/weekly-db.ts'};return p[s]?{url:new URL(p[s],import.meta.url).href,shortCircuit:true}:next(s,c);},load(url,c,next){return url.endsWith('.sql?raw')?{format:'module',source:'export default '+JSON.stringify(readFileSync(new URL(url),'utf8'))+';',shortCircuit:true}:next(url,c);}});
 const community=await import('../app/api/community/route.ts');
 const image=await import('../app/api/drawing/route.ts');
 const {weeklyChallenges,angleLabel}=await import('../lib/weekly.ts');
@@ -93,4 +93,5 @@ test('drawing drafts recover without accepting external URLs',()=>{
   const draft={id:randomUUID(),title:'رسمة',body:'فكرتي',angleId:'change',drawing:jpeg};assert.equal(readIdeaDraft(JSON.stringify(draft)).drawing,jpeg);
   assert.equal(readIdeaDraft(JSON.stringify({...draft,drawing:'https://bad.test/picture.svg'})).drawing,undefined);
 });
+
 

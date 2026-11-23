@@ -1,3 +1,6 @@
+// Authenticated image reads for saved contributions. Feed rows carry a revision
+// hash, while image bytes are returned here with private/no-store headers.
+
 import { getParticipant } from '@/lib/auth-server';
 import { database } from '@/lib/database';
 import { ensureDrawingSchema } from '@/lib/drawings';
@@ -16,3 +19,4 @@ export async function GET(request:Request){
     return new Response(Uint8Array.from(raw,c=>c.charCodeAt(0)),{headers:{...headers,'Content-Type':'image/jpeg'}});
   }catch{return new Response(null,{status:503,headers});}
 }
+
