@@ -1,3 +1,6 @@
+// Anonymous launch-ribbon endpoint. Its secure cookie identifies one visitor
+// in the launch event and does not grant access to an account.
+
 import { database } from '@/lib/database';
 import { readOpening,cutOpening,createOpeningVisitor,resolveOpeningVisitor } from '@/lib/opening';
 
@@ -29,3 +32,4 @@ export async function POST(request:Request){
     return reply(await cutOpening(db,visitor));
   }catch{ return reply({error:'تعذّر حفظ القصّة. حاول مرة ثانية؛ ما راح تنحسب مرتين.'},503); }
 }
+

@@ -94,3 +94,4 @@ test('drawing drafts recover without accepting external URLs',()=>{
   assert.equal(readIdeaDraft(JSON.stringify({...draft,drawing:'https://bad.test/picture.svg'})).drawing,undefined);
 });
 
+

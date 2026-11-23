@@ -1,42 +1,65 @@
-# ابتكر — ibtkr.space
+# ابتكر · IBTKR
 
-Arabic weekly innovation programme for the FTC Innovation Committee, independently hosted on Cloudflare Workers with D1 community data and Supabase email-code authentication.
+A weekly innovation space for the **Future Technology Club at King Saud University**. Students explore a real-life problem, share a written idea or drawing, and encourage other contributions. Each challenge can have its own interaction and visual design.
 
-## Weekly programme
+**Live site:** [ibtkr.space](https://ibtkr.space/) · **Production branch:** `main`
 
-One active problem has three angles. Participants can publish multiple tagged solutions, edit them during the week, discuss ideas and like other participants’ solutions. The weekly ranking totals likes across each participant’s entries; lifetime XP remains separate. Voting and submissions close at Friday 11:59 PM Riyadh time. Saturday starts the next scheduled challenge.
+## Start here
 
-See [weekly programme and release notes](docs/weekly-program.md) and [verification](docs/community-checks.md).
+| If you want to… | Read… |
+| --- | --- |
+| Understand the project in Arabic | [دليل اللجنة التقنية](docs/START_HERE_AR.md) |
+| Find the code for a feature | [Architecture and file map](docs/architecture.md) |
+| Understand weekly dates, votes and rankings | [Weekly programme](docs/weekly-program.md) |
+| Understand drawings and the timed packaging activity | [Drawing experiences](docs/drawings.md) |
+| Plan the move into the club portal | [Portal handover](docs/portal-handoff.md) |
+| Run checks safely | [Testing guide](docs/community-checks.md) |
+| Review secrets and access boundaries | [Security and sharing](SECURITY.md) |
 
-## Status
+## Current operating state
 
-This release is verified with automated authentication/community checks, TypeScript and a production build. Confirm deployment status and the live domain after a GitHub release. Visual browser QA and production sign-in checks complement the isolated automated suite.
+**Maintenance is enabled.** Visitors see a reusable Arabic maintenance screen. The Worker rejects application/API requests before accessing account data or D1, and the scheduled job returns without processing results or emails. Stored participation and results are retained.
 
-## Development
+The switch is `siteSettings.maintenance.enabled` in [`lib/site-settings.ts`](lib/site-settings.ts). Set it to `false`, validate and deploy to reopen on the actual weekly calendar. Email sending also has an independent safety switch, currently `WEEKLY_EMAIL_ENABLED: "false"` in `wrangler.json`. Read the [maintenance guide](docs/maintenance.md) before reopening.
 
-Use Node 24 and pnpm. Install with `pnpm install --frozen-lockfile`.
+The former committee-review pin, drawing previews, 3D prototype and hidden opening bypass have been removed from the current source. Earlier versions remain in Git history.
+
+## Technology, in plain language
+
+| Part | Technology | Responsibility |
+| --- | --- | --- |
+| Interface | React, TypeScript, Vinext/Vite, Tailwind CSS | Arabic pages, forms, drawing tools and animations |
+| Server | Cloudflare Workers | API requests and the scheduled weekly job |
+| Application database | Cloudflare D1, with Drizzle schema/migrations | Profiles, ideas, drawings, comments, votes and frozen results |
+| Sign-in | Supabase Auth | Email-code sign-in and server verification of accounts |
+| Winner emails | Resend, called by the server | Individual congratulations selected from frozen results |
+
+Supabase is the identity service. **The community database is D1.** Repository access does not automatically provide access to either production service.
+
+## Run locally
+
+Use Node 24 and the pnpm version declared in `package.json`.
 
 ```sh
+pnpm install --frozen-lockfile
 pnpm exec wrangler d1 migrations apply DB --local
 pnpm dev
-pnpm test:community
-pnpm test:auth
+```
+
+Local development still needs appropriate Supabase/Turnstile configuration if you want real sign-in. Use a development project for write testing. Ignored `.dev.vars` files are for local secrets. No production database or email credentials are needed for the isolated test suite.
+
+```sh
+pnpm test
 pnpm exec tsc --noEmit
 pnpm build
 ```
 
-Local configuration overrides can be placed in ignored `.dev.vars`. Runtime public configuration contains only the Supabase project URL, publishable key and Turnstile site key. The server verifies authenticated requests with Supabase `getUser`, ignores client identity headers and uses `supabase:<uuid>` ownership IDs. Never add service-role keys, SMTP passwords or Turnstile secrets to source.
+`pnpm test` runs every test file, including maintenance, drawings, ribbons, emails and the timed activity. Tests use SQLite fixtures, simulated clocks and mocked network requests.
 
-## Production release
+## Deployment boundary
 
-The existing target is Cloudflare Worker `ibtkr`, D1 database `ibtkr-community`, and custom domain `ibtkr.space`. Preserve the configured binding and database ID in `wrangler.json`. Do not publish this update to the former Sites hostname or recreate the production database.
+**Pushing or merging to `main` starts the existing Cloudflare production build.** Repository review does not require a deployment. Use a separate branch for changes and validate them before merging.
 
-Production is connected to the GitHub `main` branch. Merge a verified release into `main` to trigger the existing Cloudflare build. The Worker applies the additive weekly migration transactionally before its first weekly query or scheduled job, records migration 0002 for Wrangler, and applies the one-time user-authorized legacy cleanup 0003. The upgrade is repeat-safe across concurrent instances. An authenticated CLI release can also use `pnpm deploy`, which builds, applies pending remote migrations, then deploys. Verify the configured Friday 21:00 UTC cron, the live domain, authentication and mobile/desktop behavior after release.
+The production Worker is `ibtkr`, its D1 binding is `DB`, and the live domain is `ibtkr.space`. Keep those resources intact during review. `pnpm deploy` is an operator command that applies **remote** migrations and deploys the Worker. It is not a local preview command.
 
-The user requested a clean start after the weekly release. Migration 0003 deletes previous `queue`, `reverse` and `alone` posts and their comments, reactions and obsolete results. XP and achievements are recalculated from the remaining activity. Accounts, profile names and new weekly submissions remain intact. The reset is transactional and recorded once; old local drafts and drafts migrated from the previous programme are removed without clearing authentication or new weekly drafts.
-
-## References
-
-- [Email-code authentication](https://supabase.com/docs/guides/auth/auth-email-passwordless)
-- [Server-side user validation](https://supabase.com/docs/reference/javascript/auth-getuser)
-- [Worker configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
+Older migrations include one-time cleanup of pre-launch test activity. Their recorded history is part of the existing database. See the [data guide](docs/architecture.md#database-records) before planning a separate portal migration.

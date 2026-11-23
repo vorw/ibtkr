@@ -114,36 +114,16 @@ test('disabling the gate preserves visitor and cut records',async()=>{
   assert.equal((await readOpening(db,null)).isOpen,true);assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,1);
 });
 
-test('the local preview shows the Saturday challenge to guests without opening the event or exposing signed-in ideas',async()=>{
-  const db=database();await readOpening(db,null);
-  mock.timers.setTime(new Date('2026-10-09T21:30:00.000Z').getTime());
-  state.databaseNow=new Date().toISOString();state.user=null;
-  state.db.prepare('INSERT INTO ideas VALUES (?,?,?,?,?,?,?,?)').run(crypto.randomUUID(),'alice','week-2026-10-14','أحمد','عنوان خاص','شرح فكرة محفوظة لا يقرأها الزائر.',new Date().toISOString(),'change');
-  const before=await readOpening(db,null);
-  const preview=await community.GET(new Request('https://ibtkr.space/api/community?openingPreview=1'));
-  assert.equal(preview.status,200);assert.equal(preview.headers.get('cache-control'),'private, no-store');
-  const data=await preview.json();assert.equal(data.signedIn,false);assert.deepEqual(data.ideas,[]);
-  assert.equal(data.weekly.current.number,'01');assert.equal(data.weekly.current.title,'إلغاء الاشتراك… بدون دوّامة.');assert.equal(data.weekly.current.endsAt,'2026-10-16T21:00:00.000Z');assert.equal(data.weekly.weeks.length,1);assert.equal(data.weekly.current.startsAt,'2026-10-09T21:00:00.000Z');
-  assert.equal(JSON.stringify(data).includes('شرح فكرة محفوظة'),false);
-  assert.deepEqual(await readOpening(db,null),before);
-  assert.equal((await community.GET(new Request('https://ibtkr.space/api/community'))).status,423);
-  for(const value of ['0','true','2'])assert.equal((await community.GET(new Request('https://ibtkr.space/api/community?openingPreview='+value))).status,423);
+test('old preview query strings cannot bypass a closed launch gate',async()=>{
+ const db=database();await readOpening(db,null);
+ for(const user of [null,'alice']){
+  state.user=user;
+  for(const query of ['openingPreview=1','openingPreview=true','']){
+   const r=await community.GET(new Request('https://ibtkr.space/api/community?'+query));assert.equal(r.status,423);
+  }
+ }
+ assert.equal((await readOpening(db,null)).isOpen,false);
 });
-
-test('preview reads retain ordinary signed-in identity while every preview write is rejected even after public opening',async()=>{
-  const db=database();await readOpening(db,null);
-  const get=()=>community.GET(new Request('https://ibtkr.space/api/community?openingPreview=1'));
-  assert.equal((await (await get()).json()).signedIn,true);
-  const write=(query='')=>community.POST(new Request('https://ibtkr.space/api/community'+query,{method:'POST',headers:{Origin:'https://ibtkr.space','Content-Type':'application/json'},body:JSON.stringify({action:'profile',displayName:'أحمد'})}));
-  assert.equal((await write('?openingPreview=1')).status,403);
-  assert.equal((await write()).status,423);
-  assert.equal(state.db.prepare('SELECT COUNT(*) n FROM profiles').get().n,0);
-  assert.equal((await readOpening(db,null)).count,0);
-  const ids=await visitors(db,10);for(const id of ids)await cutOpening(db,id);
-  assert.equal((await write('?openingPreview=1')).status,403);
-  assert.equal((await write()).status,200);
-});
-
 
 test('lowering an existing target keeps all cuts and opens immediately if already reached',async()=>{
   for(const count of [2,10]){
@@ -155,3 +135,4 @@ test('lowering an existing target keeps all cuts and opens immediately if alread
     assert.equal(state.db.prepare('SELECT COUNT(*) n FROM opening_cuts').get().n,count);
   }
 });
+

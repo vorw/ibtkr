@@ -18,9 +18,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:community
-      - run: pnpm test:auth
-      - run: pnpm test:weekly-email
-      - run: pnpm test:opening
+      - run: pnpm test
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
+
