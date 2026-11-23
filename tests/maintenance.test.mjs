@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test, mock, afterEach } from 'node:test';
+import { test, afterEach } from 'node:test';
 import { registerHooks } from 'node:module';
 
 const stub = `export const calls=[];
@@ -9,72 +9,54 @@ export async function finalizeClosedWeeks(){calls.push('finalize')}
 export async function runWeeklyEmailJob(){calls.push('email')}`;
 const stubUrl = 'data:text/javascript,' + encodeURIComponent(stub);
 registerHooks({resolve(s,c,next){
-  if(s.endsWith('/committee-review.js'))return {url:'data:text/javascript,export const committeeReviewEnabled=false;',shortCircuit:true};
   if (['vinext/server/fetch-handler','./lib/weekly-db','./lib/weekly-schema','./lib/weekly-email'].includes(s)) return {url:stubUrl,shortCircuit:true};
   if (s==='./lib/maintenance') return {url:new URL('../lib/maintenance.ts',import.meta.url).href,shortCircuit:true};
+  if (['./site-settings','./maintenance-page'].includes(s)) return {url:new URL('../lib/'+s.slice(2)+'.ts',import.meta.url).href,shortCircuit:true};
   return next(s,c);
 }});
 const {calls}=await import(stubUrl);
 const worker=(await import('../worker.ts')).default;
-const {maintenanceResponse,MAINTENANCE_STARTS_AT,MAINTENANCE_ENDS_AT}=await import('../lib/maintenance.ts');
-const start=Date.parse(MAINTENANCE_STARTS_AT);
-const end=Date.parse(MAINTENANCE_ENDS_AT);
-afterEach(()=>{mock.timers.reset();calls.length=0});
+const {siteSettings}=await import('../lib/site-settings.ts');
+const {maintenanceResponse,isMaintenanceActive}=await import('../lib/maintenance.ts');
+afterEach(()=>{siteSettings.maintenance.enabled=true;calls.length=0});
 
-test('site and scheduled jobs remain available until Friday 11:59 pm Riyadh',async()=>{
-  assert.equal(MAINTENANCE_STARTS_AT,'2026-11-13T20:59:00.000Z');
-  mock.timers.enable({apis:['Date'],now:start-1});
-  for(const path of ['/','/login','/api/community','/api/drawing']) {
-    assert.equal(maintenanceResponse(new Request('https://ibtkr.space'+path)),null);
-  }
-  assert.equal(await (await worker.fetch(new Request('https://ibtkr.space/'),{},{})).text(),'normal site');
-  await worker.scheduled({},{});
-  assert.deepEqual(calls,['fetch','schema','finalize','email']);
-});
-test('pause activates at exactly Friday 11:59 pm Riyadh',async()=>{
-  mock.timers.enable({apis:['Date'],now:start});
-  assert.equal((await worker.fetch(new Request('https://ibtkr.space/'),{},{})).status,503);
-  assert.equal((await worker.fetch(new Request('https://ibtkr.space/api/community',{method:'POST'}),{},{})).status,503);
-  await worker.scheduled({},{});
-  assert.deepEqual(calls,[]);
-});
-test('all page routes show a temporary no-store maintenance response before the deadline',async()=>{
-  for(const path of ['/','/login','/drawing-preview2','/lab/private-preview','/?view=leaderboard']){
-    const response=maintenanceResponse(new Request('https://ibtkr.space'+path),end-1);
-    assert.equal(response.status,503);assert.match(response.headers.get('cache-control'),/no-store/);
-    assert.equal(response.headers.get('retry-after'),'Fri, 20 Nov 2026 21:00:00 GMT');
+test('maintenance is enabled without an expiring date or review bypass',async()=>{
+  assert.equal(isMaintenanceActive(),true);
+  for(const path of ['/','/login','/drawing-preview2','/lab/private-preview','/?view=leaderboard','/?openingPreview=1']){
+    const response=maintenanceResponse(new Request('https://ibtkr.space'+path));
+    assert.equal(response.status,503);
+    assert.match(response.headers.get('cache-control'),/no-store/);
+    assert.equal(response.headers.get('retry-after'),'3600');
     const html=await response.text();
-    assert.match(html,/نعود السبت، ٢١ نوفمبر/);
-    assert.match(html,/الحين وقت المذاكرة/);
-    assert.match(html,/الله يفتح عليكم وييسّر اختباراتكم/);
+    assert.match(html,/ونرجع نبتكر/);
+    assert.match(html,/مشاركاتكم ونتائجكم محفوظة/);
+    assert.doesNotMatch(html,/نوفمبر|اختبارات|resumesAt|committee/);
+    assert.match(response.headers.get('content-security-policy'),/default-src 'none'/);
   }
 });
-test('stale clients cannot submit, vote, cut ribbons or run email endpoints',async()=>{
-  for(const path of ['/api/community','/api/weekly-opening','/api/weekly-email','/api/drawing']){
+test('stale clients cannot publish, vote, cut ribbons or run email endpoints',async()=>{
+  for(const path of ['/api','/api/community','/api/weekly-opening','/api/weekly-email','/api/drawing']){
     for(const method of ['GET','POST','PUT','DELETE']){
-      const response=maintenanceResponse(new Request('https://ibtkr.space'+path,{method}),end-1);
+      const response=await worker.fetch(new Request('https://ibtkr.space'+path,{method}),{},{});
       assert.equal(response.status,503);assert.equal((await response.json()).code,'maintenance');
     }
   }
-  assert.equal(maintenanceResponse(new Request('https://ibtkr.space/assets/ftc-logo.svg',{method:'POST'}),end-1).status,503);
-});
-test('only the exact branding and font assets bypass the pause; HEAD bodies are empty',async()=>{
-  for(const path of ['/assets/ftc-logo.svg','/favicon.svg','/fonts/plex-arabic-regular.woff2','/fonts/plex-arabic-medium.woff2']) assert.equal(maintenanceResponse(new Request('https://ibtkr.space'+path),end-1),null);
-  assert.equal(maintenanceResponse(new Request('https://ibtkr.space/assets/anything.js'),end-1).status,503);
-  const response=maintenanceResponse(new Request('https://ibtkr.space/',{method:'HEAD'}),end-1);
-  assert.equal(response.status,503);assert.equal(await response.text(),'');
-});
-test('worker blocks requests and scheduled work without touching application handlers or the database',async()=>{
-  mock.timers.enable({apis:['Date'],now:end-1});
-  assert.equal((await worker.fetch(new Request('https://ibtkr.space/api/community',{method:'POST'}),{},{})).status,503);
   await worker.scheduled({},{});assert.deepEqual(calls,[]);
 });
-test('at exactly Saturday midnight Riyadh, requests and the existing cron resume automatically',async()=>{
-  mock.timers.enable({apis:['Date'],now:end});
+test('only exact branding/font reads bypass maintenance and HEAD bodies are empty',async()=>{
+  for(const path of ['/assets/ftc-logo.svg','/favicon.svg','/fonts/plex-arabic-regular.woff2','/fonts/plex-arabic-medium.woff2']){
+    for(const method of ['GET','HEAD'])assert.equal(maintenanceResponse(new Request('https://ibtkr.space'+path,{method})),null);
+    assert.equal(maintenanceResponse(new Request('https://ibtkr.space'+path,{method:'POST'})).status,503);
+  }
+  for(const path of ['/assets/anything.js','/assets/ftc-logo.svg/extra','/fonts/other.woff2','/api/community']){
+    const response=maintenanceResponse(new Request('https://ibtkr.space'+path,{method:'HEAD'}));
+    assert.equal(response.status,503);assert.equal(await response.text(),'');
+  }
+});
+test('disabling the switch restores the app and original scheduled work',async()=>{
+  siteSettings.maintenance.enabled=false;
+  assert.equal(isMaintenanceActive(),false);
   assert.equal(maintenanceResponse(new Request('https://ibtkr.space/')),null);
   assert.equal(await (await worker.fetch(new Request('https://ibtkr.space/'),{},{})).text(),'normal site');
-  await worker.scheduled({},{});
-  assert.deepEqual(calls,['fetch','schema','finalize','email']);
+  await worker.scheduled({},{});assert.deepEqual(calls,['fetch','schema','finalize','email']);
 });
-
-

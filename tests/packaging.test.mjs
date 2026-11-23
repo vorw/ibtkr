@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {packagingGameHtml,packagingTasks} from '../lib/packaging-game.ts';
-import {packagingSession} from '../lib/committee-review.js';
 
 const weekStart=Date.parse('2026-11-06T21:00:00Z'),weekEnd='2026-11-13T21:00:00.000Z';
 const html=packagingGameHtml.replace('__PACKAGING_TASKS__',JSON.stringify(packagingTasks)).replaceAll('__WEEK_ID__','week-2026-11-11').replaceAll('__WEEK_ENDS__',weekEnd);
@@ -65,19 +64,4 @@ test('finished attempts expose only share and cannot restart, including after re
 });
 
 
-test('committee review runs a fresh two-minute attempt after closing without overwriting a real attempt',async()=>{
- const original=game();await original.run('begin()');original.run('end(true)');
- const originalKey=[...original.saved.keys()][0],originalValue=original.saved.get(originalKey);
- const week={id:'week-2026-11-11',endsAt:weekEnd},session=packagingSession(week,true);
- const preview=packagingGameHtml.replace('__PACKAGING_TASKS__',JSON.stringify(packagingTasks)).replaceAll('__WEEK_ID__',session.storageWeekId).replaceAll('__WEEK_ENDS__',session.endsAt).split('<script>')[1].split('</script>')[0];
- const now=Date.parse('2026-11-14T09:00:00.000Z');
- const review=game(original.saved,now,preview);assert.equal(review.run('state'),null);await review.run('begin()');
- assert.equal(review.run('state.deadline-Date.now()'),120000);assert.equal(review.element('seconds').textContent,'02:00');
- assert.equal(review.saved.get(originalKey),originalValue);assert.equal(review.saved.size,2);
- review.advance(120000);assert.equal(review.run('state.status'),'done');
- const refreshed=game(review.saved,now+120000,preview);assert.equal(refreshed.run('state.status'),'done');assert.equal(refreshed.saved.get(originalKey),originalValue);
-});
-test('normal game still uses the real deadline and cannot start after closing',async()=>{
- const week={id:'week-2026-11-11',endsAt:weekEnd};assert.deepEqual(packagingSession(week,false),{storageWeekId:week.id,endsAt:week.endsAt});
- const g=game(new Map(),Date.parse(weekEnd));await g.run('begin()');assert.equal(g.run('state'),null);
-});
+test('an attempt cannot begin at or after the weekly closing deadline',async()=>{const g=game(new Map(),Date.parse(weekEnd));await g.run('begin()');assert.equal(g.run('state'),null);});

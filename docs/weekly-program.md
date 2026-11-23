@@ -17,7 +17,7 @@ The current twenty-week schedule starts **10 October 2026 at 00:00 Riyadh** and 
 | 03 | `week-2026-10-28` | Redesign a car warning icon, drawing | 24–31 October 2026 |
 | 05 | `week-2026-11-11` | Packaging icons, two-minute drawing activity | 7–14 November 2026 |
 
-The cup challenge remains a comparison preview. It is not the official week 03 content. Week 05 is currently pinned for committee review, while the calendar continues to use real timestamps internally.
+Week 03 uses the car-symbol content. The discarded cup preview and historical committee-review pin have been removed. Maintenance pauses access without changing any challenge ID or timestamp.
 
 ## Closing time
 
@@ -37,7 +37,7 @@ At that boundary, new submissions, edits and vote changes for the old week are r
 
 `finalizeClosedWeeks()` writes a closed week's ranking and its finalization marker in one atomic batch. Repeating the operation does not replace the snapshot. It normally runs from the scheduled job, with community reads providing a fallback.
 
-Archived contributions and final rankings remain linked to their original week. Discussion can remain open in normal mode, but committee review also blocks new comments. A new week does not reset account profiles or lifetime progress.
+Archived contributions and final rankings remain linked to their original week. Discussion can remain open in normal mode. Maintenance blocks all application requests, including comments. A new week does not reset account profiles or lifetime progress.
 
 ## Changing future content
 

@@ -15,16 +15,16 @@ flowchart TD
   Results --> Resend[Resend acceptance]
 ```
 
-During committee review, requests reach the normal site, but community writes other than profile setup/renaming are rejected. The scheduled job exits before doing any work. Authentication checks remain in place.
+Maintenance currently stops application requests before the normal flow. The scheduled job also returns before touching D1 or the email provider. Only exact logo/favicon/font reads bypass the pause.
 
 ## Read the site in this order
 
 1. `app/page.tsx` mounts the main interface in `app/innovation-app.tsx`.
-2. `lib/weekly.ts` defines the calendar and content. `currentChallenge()` follows real time. `displayedChallenge()` can select the committee review week for presentation.
+2. `lib/weekly.ts` defines the calendar and content. `currentChallenge()` follows real time. There is no pinned review week.
 3. `app/api/community/route.ts` verifies the account, checks the operation and calls the database helpers.
 4. `lib/community-read.ts` chooses a displayed/archive week, loads paged data and selects live or frozen ranking rows.
 5. `lib/weekly-db.ts` totals genuine likes and saves closed-week rankings atomically.
-6. `worker.ts` runs the five-minute background job when neither review nor maintenance blocks it.
+6. `worker.ts` runs the five-minute background job when maintenance is disabled. Email sending also requires its own enabled flag.
 
 ## Feature map
 
@@ -40,17 +40,13 @@ During committee review, requests reach the normal site, but community writes ot
 | Drawing images | `lib/drawings.ts`, `lib/drawing-policy.ts`, `app/api/drawing/route.ts` | Small raster images, authenticated reads and no-store responses. |
 | Opening ribbons | `lib/opening.ts`, `lib/weekly-opening.ts`, `app/opening-gate.tsx` | Anonymous browser visitors can cut once per event token. |
 | Winner emails | `lib/weekly-email.ts`, `lib/weekly-email-template.ts` | Frozen results, verified account email and repeat protection. |
-| Temporary modes | `lib/committee-review.js`, `lib/maintenance.ts`, `worker.ts` | Review and maintenance have different effects. See below. |
+| Maintenance | `lib/site-settings.ts`, `lib/maintenance.ts`, `lib/maintenance-page.ts`, `worker.ts` | One manual switch blocks the app/API and scheduled work. |
 
-## Temporary modes
+## Maintenance boundary
 
-| Mode | What visitors see | Writes | Background job |
-| --- | --- | --- | --- |
-| Normal schedule | The challenge whose real start/end window contains the current time | Usual account, ownership and deadline rules | Finalizes closed weeks and processes congratulations |
-| Committee review | The pinned week, currently week 05 | Profile setup/renaming only. Drawing attempts stay local. | Returns immediately |
-| Maintenance window | The exam message instead of the application | Application API requests receive temporary-unavailable responses | Returns immediately |
+`worker.ts` checks maintenance before calling the framework. Pages receive the new branded HTML with HTTP 503. API calls and non-read methods receive JSON 503. Responses are not cached. The cron exits without finalization or email work.
 
-Review bypasses the maintenance page. Clearing review resumes whatever the **actual** calendar allows. The configured November exam window has already expired. Update a maintenance window deliberately if another pause is needed.
+The setting has no expiry date or public override. See [maintenance operations](maintenance.md) for reopening and the independent email switch.
 
 ## Database records
 
@@ -76,8 +72,6 @@ Migrations `0003` and `0005` contain historical cleanup/archiving. They are guar
 
 ## Supporting folders
 
-- `components/ui/` contains reusable UI building blocks. Many are supplied components rather than IBTKR business rules.
+- `components/ui/` contains reusable UI building blocks. Only components referenced by the current application remain.
 - `public/` contains the club logo, favicon and Arabic fonts. Font and third-party licence text should remain intact.
-- `app/lab/` and the drawing preview routes are experiments or comparison pages. Unlisted URLs and `noindex` are not password protection.
-- `examples/` is reference starter code, not the live community database API.
-- `build/`, `scripts/` and `vendor/` support installation/build compatibility. The active Vite configuration is `vite.config.ts`.
+- `scripts/deploy-independent.mjs` is the operator deployment script. `vendor/` retains licensed styling. The active build configuration is `vite.config.ts`.

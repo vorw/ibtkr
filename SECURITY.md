@@ -2,9 +2,9 @@
 
 ## Access boundaries
 
-This is a private code repository. Repository access includes its files and accessible Git history. It does not automatically grant access to Cloudflare, Supabase, Resend or the live student database.
+This repository is prepared for public code inspection. Public visibility includes tracked files, accessible Git history and public build logs. It does not grant access to Cloudflare, Supabase, Resend or the live student database.
 
-The repository belongs to a personal GitHub account. GitHub personal private repositories give collaborators read/write access, not a read-only role. See [GitHub permission levels](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/repository-access-and-collaboration/permission-levels-for-a-personal-account-repository). For code inspection without access to the production-connected repository, share a source snapshot or use a separate review repository. Organization-owned repositories offer more granular roles.
+Public visitors can read and copy code without becoming collaborators or receiving push permission. Keep owner access for maintenance and releases. Archiving would make the owner's repository read-only too and prevent normal updates. Review any existing collaborator permissions separately in GitHub settings.
 
 The production `main` branch triggers a Cloudflare build. Give code review its own branch and keep production publishing deliberate.
 
@@ -20,11 +20,11 @@ The value beginning `sb_secret_` in the authentication test is an intentionally 
 
 Students' contributions and drawings are stored in D1. Authentication/account email records belong to Supabase Auth. The private email outbox can contain recipient information and must not be exposed as a public feed or copied into fixtures.
 
-Preserve normal account checks when demonstrating the application. Unlisted lab URLs and a local opening-preview shortcut are presentation tools, not private access controls.
+Preserve normal account checks when demonstrating the application. Experimental routes and the hidden opening shortcut have been removed. Maintenance is enforced before application requests, including direct API calls.
 
 ## Checks for a handover
 
-Review tracked files and accessible branch history for credentials and personal exports. Check suspicious values in context rather than treating public keys or deliberately invalid test fixtures as live secrets. Include licences, dependency versions and the distinction between production code and experiments in the handover.
+Review tracked files and accessible branch history for credentials and personal exports. Check suspicious values in context rather than treating public keys or deliberately invalid test fixtures as live secrets. Include licences and dependency versions in the handover. Removed experiments remain in Git history, so deletion from the current tree is not history erasure.
 
 If a real credential is discovered in history, removing it from the newest file is insufficient. Rotate/revoke it with the service owner and agree how to handle affected history before sharing access. Do not rewrite shared history silently.
 

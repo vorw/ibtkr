@@ -16,17 +16,13 @@ A weekly innovation space for the **Future Technology Club at King Saud Universi
 | Run checks safely | [Testing guide](docs/community-checks.md) |
 | Review secrets and access boundaries | [Security and sharing](SECURITY.md) |
 
-## Current review mode
+## Current operating state
 
-The site is deliberately showing **week 05**, `week-2026-11-11`: **رسالة على علبة. يفهمها أي أحد.**
+**Maintenance is enabled.** Visitors see a reusable Arabic maintenance screen. The Worker rejects application/API requests before accessing account data or D1, and the scheduled job returns without processing results or emails. Stored participation and results are retained.
 
-- Reviewers can try the two-minute drawing activity and browse the original leaderboard.
-- Viewing community contributions and their images still requires normal sign-in.
-- New submissions, edits, comments and vote changes are blocked. Profile setup and renaming remain available.
-- The scheduled worker returns before processing results or sending winner emails.
-- Review attempts use separate browser storage. Original challenge IDs, dates and stored results are unchanged.
+The switch is `siteSettings.maintenance.enabled` in [`lib/site-settings.ts`](lib/site-settings.ts). Set it to `false`, validate and deploy to reopen on the actual weekly calendar. Email sending also has an independent safety switch, currently `WEEKLY_EMAIL_ENABLED: "false"` in `wrangler.json`. Read the [maintenance guide](docs/maintenance.md) before reopening.
 
-The switch is `committeeReviewWeekId` in [`lib/committee-review.js`](lib/committee-review.js). Setting it to `null` resumes the real-time schedule. It does **not** rewind dates or automatically create a new maintenance window. The exam pause in `lib/maintenance.ts` ended on 21 November 2026 at 00:00 Riyadh.
+The former committee-review pin, drawing previews, 3D prototype and hidden opening bypass have been removed from the current source. Earlier versions remain in Git history.
 
 ## Technology, in plain language
 
@@ -58,7 +54,7 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-`pnpm test` runs every test file, including review mode, drawings, ribbons, emails and the timed activity. Tests use SQLite fixtures, simulated clocks and mocked network requests.
+`pnpm test` runs every test file, including maintenance, drawings, ribbons, emails and the timed activity. Tests use SQLite fixtures, simulated clocks and mocked network requests.
 
 ## Deployment boundary
 

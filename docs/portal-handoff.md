@@ -40,6 +40,6 @@ These are implementation decisions to agree together, not features already avail
 
 ## Review sequence
 
-Read the [Arabic introduction](START_HERE_AR.md), then [architecture](architecture.md). Try the live committee review. Walk through `lib/weekly.ts`, the corresponding UI, the community route and the frozen-result query together. Use the tests to confirm expected behaviour before deciding what to carry into the portal.
+Read the [Arabic introduction](START_HERE_AR.md), then [architecture](architecture.md). Use the code and isolated tests while live maintenance is enabled. Run interactive checks against a development database. Walk through `lib/weekly.ts`, the corresponding UI, the community route and the frozen-result query together. Use the tests to confirm expected behaviour before deciding what to carry into the portal.
 
 `main` is production-connected. Start code experiments on a separate branch. A review invitation should not require access to production service dashboards, credentials or participant exports.

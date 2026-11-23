@@ -2,7 +2,7 @@
 
 ## Current status
 
-Committee review is active. `worker.ts` returns before running the scheduled weekly job, so this review does not enqueue or send congratulations. This is independent of the non-secret `WEEKLY_EMAIL_ENABLED` option in `wrangler.json`.
+Maintenance is enabled. `worker.ts` returns before running the scheduled weekly job, so the paused site does not enqueue or send congratulations. The independent `WEEKLY_EMAIL_ENABLED` option is also set to `"false"` in `wrangler.json`. Reopening the site alone does not enable sending.
 
 This guide explains the normal pipeline. It does not assert that production secrets are currently bound or that a particular message has been sent.
 

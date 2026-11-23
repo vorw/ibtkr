@@ -1,26 +1,25 @@
 // Read model for the community screen: filtering, pagination, discussion and
 // rankings. Account checks happen in the route before this helper is called.
 
-import type { AppData, Comment, Idea, Leader } from './challenges';
-import { committeeReviewEnabled } from './committee-review.js';
+import type { AppData, Comment, Idea, Leader } from "./challenges";
 import {
-  displayedChallenge,
+  currentChallenge,
   challengeStatus,
   findWeek,
   weeklyChallenges,
   legacyChallengeIds,
-} from './weekly';
-import { finalizeClosedWeeks, scoresSQL } from './weekly-db';
-import { ensureDrawingSchema } from './drawings';
+} from "./weekly";
+import { finalizeClosedWeeks, scoresSQL } from "./weekly-db";
+import { ensureDrawingSchema } from "./drawings";
 
 const pageSize = 12;
 const numberPage = (value: string | null) =>
-  Math.min(100000, Math.max(1, Number.parseInt(value ?? '1', 10) || 1));
-type IdeaRow = Omit<Idea, 'isOwn' | 'liked' | 'comments'> & {
+  Math.min(100000, Math.max(1, Number.parseInt(value ?? "1", 10) || 1));
+type IdeaRow = Omit<Idea, "isOwn" | "liked" | "comments"> & {
   user_id: string;
   liked: number;
 };
-type CommentRow = Omit<Comment, 'isOwn'> & { user_id: string };
+type CommentRow = Omit<Comment, "isOwn"> & { user_id: string };
 
 export async function readCommunity(
   db: D1Database,
@@ -30,62 +29,57 @@ export async function readCommunity(
 ): Promise<AppData> {
   await ensureDrawingSchema(db);
   const now = new Date();
-  const current = displayedChallenge(now);
-  // Hide future schedule entries while presenting the historical review week.
-  const availableBefore =
-    committeeReviewEnabled && current
-      ? new Date(Date.parse(current.endsAt) - 1).toISOString()
-      : now.toISOString();
+  const current = currentChallenge(now);
   const available = weeklyChallenges
-    .filter((week) => week.startsAt <= availableBefore)
+    .filter((week) => week.startsAt <= now.toISOString())
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  const requested = params.get('week');
+  const requested = params.get("week");
   const selected =
-    requested === 'legacy' || requested === 'all'
+    requested === "legacy" || requested === "all"
       ? (current ?? available[0] ?? null)
-      : ((requested && requested !== 'current'
+      : ((requested && requested !== "current"
           ? available.find((week) => week.id === requested)
           : (current ?? available[0])) ?? null);
-  const legacy = requested === 'legacy';
-  const all = requested === 'all';
+  const legacy = requested === "legacy";
+  const all = requested === "all";
   const status = legacy
-    ? 'legacy'
+    ? "legacy"
     : selected
       ? challengeStatus(selected, now)
-      : 'waiting';
+      : "waiting";
   // Repeat-safe fallback: read requests can freeze an overdue real result.
   await finalizeClosedWeeks(db, now);
   const where: string[] = [];
   const bindings: (string | number)[] = [];
   if (all) {
-    where.push('1=1');
+    where.push("1=1");
   } else if (legacy) {
     where.push(
-      `i.challenge_id IN (${legacyChallengeIds.map(() => '?').join(',')})`,
+      `i.challenge_id IN (${legacyChallengeIds.map(() => "?").join(",")})`,
     );
     bindings.push(...legacyChallengeIds);
   } else {
-    where.push('i.challenge_id=?');
-    bindings.push(selected?.id ?? 'no-active-week');
+    where.push("i.challenge_id=?");
+    bindings.push(selected?.id ?? "no-active-week");
   }
-  if (params.get('scope') === 'mine') {
-    where.push('i.user_id=?');
-    bindings.push(userId ?? 'guest');
+  if (params.get("scope") === "mine") {
+    where.push("i.user_id=?");
+    bindings.push(userId ?? "guest");
   }
-  const angle = params.get('angle');
+  const angle = params.get("angle");
   if (angle && weeklyChallenges[0].angles.some((item) => item.id === angle)) {
-    where.push('i.angle_id=?');
+    where.push("i.angle_id=?");
     bindings.push(angle);
   }
-  const query = (params.get('q') ?? '').trim().slice(0, 80);
+  const query = (params.get("q") ?? "").trim().slice(0, 80);
   if (query) {
     where.push(
       "(i.title LIKE ? ESCAPE '\\' OR i.body LIKE ? ESCAPE '\\' OR COALESCE(p.display_name,i.name) LIKE ? ESCAPE '\\')",
     );
-    const pattern = '%' + query.replace(/[\\%_]/g, '\\$&') + '%';
+    const pattern = "%" + query.replace(/[\\%_]/g, "\\$&") + "%";
     bindings.push(pattern, pattern, pattern);
   }
-  const clause = where.join(' AND ');
+  const clause = where.join(" AND ");
   const total =
     (
       await db
@@ -96,7 +90,7 @@ export async function readCommunity(
         .first<{ n: number }>()
     )?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(pages, numberPage(params.get('page')));
+  const page = Math.min(pages, numberPage(params.get("page")));
   const select = `SELECT i.id,i.user_id,i.challenge_id,i.angle_id,COALESCE(p.display_name,i.name) name,i.title,i.body,i.created_at,
     (SELECT revision FROM idea_drawings d WHERE d.idea_id=i.id) drawingRevision,
     (SELECT COUNT(*) FROM reactions r WHERE r.idea_id=i.id AND r.liked=1 AND r.user_id<>i.user_id) likes,
@@ -104,9 +98,9 @@ export async function readCommunity(
     (SELECT COUNT(*) FROM comments c WHERE c.idea_id=i.id) commentCount
     FROM ideas i LEFT JOIN profiles p ON p.user_id=i.user_id`;
   const sort =
-    params.get('sort') === 'popular'
-      ? 'likes DESC,i.created_at DESC,i.id DESC'
-      : 'i.created_at DESC,i.id DESC';
+    params.get("sort") === "popular"
+      ? "likes DESC,i.created_at DESC,i.id DESC"
+      : "i.created_at DESC,i.id DESC";
   const [rows, own, reviews, profile] = await Promise.all([
     userId
       ? db
@@ -119,7 +113,7 @@ export async function readCommunity(
     userId
       ? db
           .prepare(
-            'SELECT COUNT(*) total,COUNT(DISTINCT challenge_id) rewarded FROM ideas WHERE user_id=?',
+            "SELECT COUNT(*) total,COUNT(DISTINCT challenge_id) rewarded FROM ideas WHERE user_id=?",
           )
           .bind(userId)
           .first<{ total: number; rewarded: number }>()
@@ -127,14 +121,14 @@ export async function readCommunity(
     userId
       ? db
           .prepare(
-            'SELECT COUNT(DISTINCT c.idea_id) total FROM comments c JOIN ideas i ON c.idea_id=i.id WHERE c.user_id=? AND i.user_id<>?',
+            "SELECT COUNT(DISTINCT c.idea_id) total FROM comments c JOIN ideas i ON c.idea_id=i.id WHERE c.user_id=? AND i.user_id<>?",
           )
           .bind(userId, userId)
           .first<{ total: number }>()
       : null,
     userId
       ? db
-          .prepare('SELECT display_name FROM profiles WHERE user_id=?')
+          .prepare("SELECT display_name FROM profiles WHERE user_id=?")
           .bind(userId)
           .first<{ display_name: string }>()
       : null,
@@ -149,8 +143,8 @@ export async function readCommunity(
     };
   };
   let focusedIdea: Idea | undefined;
-  let discussion: AppData['discussion'];
-  const ideaId = focusId ?? params.get('idea');
+  let discussion: AppData["discussion"];
+  const ideaId = focusId ?? params.get("idea");
   if (userId && ideaId && /^[0-9a-f-]{36}$/i.test(ideaId)) {
     const row = await db
       .prepare(`${select} WHERE i.id=?`)
@@ -160,7 +154,7 @@ export async function readCommunity(
       focusedIdea = map(row);
       const commentPage = Math.min(
         Math.max(1, Math.ceil(row.commentCount / 20)),
-        numberPage(params.get('commentPage')),
+        numberPage(params.get("commentPage")),
       );
       const comments = await db
         .prepare(
@@ -192,7 +186,7 @@ export async function readCommunity(
     finalized = Boolean(
       await db
         .prepare(
-          'SELECT challenge_id FROM finalized_weeks WHERE challenge_id=?',
+          "SELECT challenge_id FROM finalized_weeks WHERE challenge_id=?",
         )
         .bind(selected.id)
         .first(),
@@ -210,7 +204,7 @@ export async function readCommunity(
       )?.n ?? 0;
     leaderPage = Math.min(
       Math.max(1, Math.ceil(leaderTotal / 20)),
-      numberPage(params.get('leaderPage')),
+      numberPage(params.get("leaderPage")),
     );
     const [ranking, mine] = await Promise.all([
       db
@@ -240,11 +234,11 @@ export async function readCommunity(
     ownLikes = mine?.likes ?? 0;
   }
   const reset = await db
-    .prepare('SELECT name FROM d1_migrations WHERE name=?')
-    .bind('0005_launch_week_one.sql')
+    .prepare("SELECT name FROM d1_migrations WHERE name=?")
+    .bind("0005_launch_week_one.sql")
     .first();
   return {
-    activityVersion: reset ? 'official-launch-2026-10-07' : undefined,
+    activityVersion: reset ? "official-launch-2026-10-07" : undefined,
     signedIn: Boolean(userId),
     ideas: rows.results.map(map),
     focusedIdea,
@@ -256,7 +250,6 @@ export async function readCommunity(
       xp: (own?.rewarded ?? 0) * 20 + (reviews?.total ?? 0) * 5,
     },
     weekly: {
-      review: committeeReviewEnabled,
       current,
       selected,
       weeks: available,

@@ -21,11 +21,11 @@ Only the current browser's private cut position is returned. Other visitor token
 
 Waiting visitors see the ribbon release. Later visits skip the completed ceremony. Refreshing a finished weekly opening must not flash the old wrapper. The weekly opening affects the question, while the community, leaderboard and profile navigation remain available under their normal rules.
 
-Committee review reveals the pinned question without changing stored cuts and rejects weekly cut writes. Real sign-in is still required to read private community content.
+Maintenance blocks ribbon reads/cuts along with application requests. Stored opening events and accepted cuts remain intact. Normal sign-in is required for private community content when the site reopens.
 
-## Local preview and accessibility
+## Accessibility and sound
 
-`/opening-preview` is a two-participant visual rehearsal with local state. It does not add production cuts. The original opening page also has a small invisible top-right preview control. This is a local presentation shortcut, not a privileged account or an access-control mechanism. Its `openingPreview=1` community requests are read-only.
+The rehearsal route and invisible top-right preview bypass have been removed. Query parameters do not grant access past the opening gate.
 
 Pointer, tap and keyboard alternatives use the same server rules. Reduced motion limits decorations. Audio uses unpitched physical effects such as scissors, cloth, air and applause-style noise. It does not include music or pitched instruments.
 

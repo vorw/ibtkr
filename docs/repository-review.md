@@ -1,43 +1,31 @@
-# Repository handover review · 23 November 2026
+# Repository publication review · 23 November 2026
 
 ## Scope
 
-The review started from `66848ab48d18291e820de2ed83e2e5c6ef28629f` on `main`.
+The preparation began from `66848ab48d18291e820de2ed83e2e5c6ef28629f` on `main`. It includes a friendly English/Arabic handover and a separate requested cleanup and maintenance change.
 
-- Examined 195 tracked text files in the current source tree.
-- Scanned the available patches and messages for 89 distinct commits reachable through the three listed branches. The initial lockfile was read separately because its large patch was omitted by the API.
-- Checked for credential patterns, private-key material, local secret/database/export filenames and hard-coded email addresses.
-- Preserved the five binary font/image assets, third-party code and licence texts.
+- Examined 195 tracked text files in the original source tree.
+- Scanned available patches and messages for 89 distinct commits across the three original branches. The initial lockfile was read separately because its large patch was omitted by the API.
+- Checked credential patterns, private-key material, local secret/database/export filenames and hard-coded email addresses.
+- Retained required fonts, brand assets and licence notices.
 
-No live credential or participant contact list was found in this scope. The secret-shaped value in the authentication test is an intentionally invalid test fixture. Public service identifiers and publishable/site keys are configuration, not administrative credentials.
+No live credential or participant contact list was found within that review scope. The secret-shaped authentication test value is an intentionally invalid fixture. Publishable/site keys and service resource IDs are not server credentials.
 
-This is a repository handover review, not a penetration test, a proof that no possible secret exists, or an audit of production dashboard bindings. Unreachable/deleted Git objects and service-side account settings were outside this source review.
+Unreachable Git objects, service-side bindings and account permissions are outside this source review. Tests and scans do not establish provider delivery or inbox placement.
 
-## Improvements
+## Resulting source
 
-- Rewrote the README and feature guides around the actual implementation.
-- Added an Arabic introduction, architecture map, portal integration discussion and sharing guide.
-- Corrected old dates, ribbon targets, the official car-symbol challenge and the rank 1–3 positive-like winner rule.
-- Explained review mode, its write restrictions, separate local drawing attempts and paused email job.
-- Reformatted application helpers and added purpose/flow comments without changing application logic.
-- Repaired two old normal-mode test loaders so the temporary review configuration does not change their scenario.
-- Added `pnpm test` and made the verification workflow run the complete test suite.
+- Clear README, Arabic introduction, architecture map, feature guides and portal handover notes.
+- Removed the unlisted 3D game, sketch lab, cup/car comparison routes, opening rehearsal and hidden preview bypass.
+- Removed the historical committee-review pin and obsolete starter/build helpers.
+- Retained official challenge components, stable week IDs, scoring, ribbons, drawings and email repeat protection.
+- Replaced the dated exam pause with a reusable maintenance switch, enabled for this release. Email sending is independently disabled.
+- No participant-data deletion, database reset, manual email send or new migration is part of this release.
+
+Deleted experiments still exist in Git history. Publishing a repository reveals that history as well as its newest tree.
 
 ## Verification
 
-| Check | Result |
-| --- | --- |
-| Isolated automated suite | 136 tests passed |
-| TypeScript | `pnpm exec tsc --noEmit` passed |
-| Production build | `pnpm build` passed locally |
-| Application code equivalence | 37 modified runtime files retained the same executable syntax structure, allowing formatting-only parentheses/boolean grouping |
-| Documentation links | Local links resolved |
-| Whitespace check | `git diff --check` passed |
+Run the complete isolated suite, TypeScript check and production build for this cleanup. Maintenance tests cover direct API calls, stale clients, exact asset paths, empty HEAD responses and paused scheduled work. Production deployment and live verification are separate release steps.
 
-The current site remains on the same committee review week. This work does not change student data, send emails, grant access or migrate the site into the portal.
-
-## Sharing recommendation
-
-For an initial inspection, use the clean source snapshot. It excludes Git history, dependencies, local settings, build output and production data. The production repository can remain private.
-
-If direct GitHub collaboration is chosen later, remember that this personal private repository gives collaborators write access and `main` is production-connected. See [SECURITY.md](../SECURITY.md).
+Public readers do not need collaborator invitations or push permission. Keep owner edit access so the maintenance setting can be changed later. See [SECURITY.md](../SECURITY.md).

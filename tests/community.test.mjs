@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { state, resetDatabase } from './community-fixture.mjs';
 
 // Isolated test identities and SQLite; no production headers, account, or database are changed.
-registerHooks({resolve(s,c,next){if(s.endsWith('/committee-review.js'))return {url:'data:text/javascript,export const committeeReviewEnabled=false;export const committeeReviewWeekId=null;',shortCircuit:true};const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
+registerHooks({resolve(s,c,next){const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
 registerHooks({ resolve(specifier, context, next) {
   const aliases = {
     '@/lib/auth-server': './community-fixture.mjs',

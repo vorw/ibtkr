@@ -3,7 +3,7 @@ import {test,beforeEach,afterEach,after,mock} from 'node:test';
 import {registerHooks} from 'node:module';
 import {readFileSync} from 'node:fs';
 import {state,resetDatabase,database} from './community-fixture.mjs';
-registerHooks({resolve(s,c,next){if(s.endsWith('/committee-review.js'))return {url:'data:text/javascript,export const committeeReviewEnabled=false;export const committeeReviewWeekId=null;',shortCircuit:true};const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
+registerHooks({resolve(s,c,next){const paths={'@/lib/drawings':'../lib/drawings.ts','@/lib/drawing-policy':'../lib/drawing-policy.ts','./drawings':'../lib/drawings.ts'};return paths[s]?{url:new URL(paths[s],import.meta.url).href,shortCircuit:true}:next(s,c);}});
 registerHooks({resolve(s,c,next){
   const a={'@/lib/database':'./community-fixture.mjs','@/lib/auth-server':'./community-fixture.mjs','@/lib/opening':'../lib/opening.ts','@/lib/weekly':'../lib/weekly.ts','@/lib/weekly-opening':'../lib/weekly-opening.ts','@/lib/challenges':'../lib/challenges.ts','@/lib/profile':'../lib/profile.ts','@/lib/community-read':'../lib/community-read.ts','@/lib/weekly-schema':'../lib/weekly-schema.ts','./weekly-ribbon-policy':'../lib/weekly-ribbon-policy.ts','./weekly':'../lib/weekly.ts','./weekly-content':'../lib/weekly-content.ts','./weekly-db':'../lib/weekly-db.ts'};
   return a[s]?{url:new URL(a[s],import.meta.url).href,shortCircuit:true}:next(s,c);

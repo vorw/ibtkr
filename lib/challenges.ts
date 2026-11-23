@@ -1,5 +1,5 @@
 // Shared response types for the interface and community API. The weekly object
-// carries the selected archive, ranking data and optional review-mode flag.
+// carries the selected archive and ranking data.
 
 export type Comment = {
   id: string;
@@ -37,12 +37,11 @@ export type AppData = {
   progress: { xp: number; ideas: number; reviews: number };
   profile: { displayName: string } | null;
   weekly: {
-    review?: boolean;
     ribbonOpen?: boolean;
-    current: import('./weekly').WeeklyChallenge | null;
-    selected: import('./weekly').WeeklyChallenge | null;
-    weeks: import('./weekly').WeeklyChallenge[];
-    status: 'open' | 'closed' | 'upcoming' | 'legacy' | 'waiting';
+    current: import("./weekly").WeeklyChallenge | null;
+    selected: import("./weekly").WeeklyChallenge | null;
+    weeks: import("./weekly").WeeklyChallenge[];
+    status: "open" | "closed" | "upcoming" | "legacy" | "waiting";
     serverNow: string;
     ownEntries: number;
     ownLikes: number;
